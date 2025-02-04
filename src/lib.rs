@@ -25,6 +25,19 @@ pub struct MISOFrame {
     checksum: u8,
 }
 
+pub fn calculate_check_sum(frame: &MOSIFrame) -> u8 {
+    let mut sum: u8 = 0;
+    sum = sum.wrapping_add(frame.address);
+    sum = sum.wrapping_add(frame.command);
+    sum = sum.wrapping_add(frame.data_length);
+    for idx in 0..frame.data_length as usize {
+       sum = sum.wrapping_add(frame.data[idx]); 
+    }
+    sum ^= 0xFF;
+
+    sum
+}
+
 pub fn to_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 256>, TranslationError> {
     let mut out = ArrayVec::new();
     if data.len() > 256 {
