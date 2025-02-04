@@ -56,10 +56,21 @@ pub fn to_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 256>, TranslationError> {
     Ok(out)
 }
 
-fn from_shdlc() {
+fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 256>, TranslationError> {
+    let mut out = ArrayVec::new();
+
+    let mut iter = data.into_iter();
     
+    while let Some(&byte) = iter.next() {
+        match byte {
+            
+        }
+    }
+
+    Ok(out)
 }
 
 pub enum TranslationError {
-    DataTooLarge
+    DataTooLarge,
+    FrameEndInData,
 }
