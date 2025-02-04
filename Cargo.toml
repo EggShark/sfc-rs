@@ -2,6 +2,7 @@
 name = "sfc5xxx-rs"
 version = "0.1.0"
 edition = "2021"
+authors = ["Charlotte Crabtree <eggshark@eggshark.dev>"]
 
 [dependencies]
 arrayvec = "0.7.6"
