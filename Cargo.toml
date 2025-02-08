@@ -6,3 +6,4 @@ authors = ["Charlotte Crabtree <eggshark@eggshark.dev>"]
 
 [dependencies]
 arrayvec = "0.7.6"
+serialport = "4.7.0"
