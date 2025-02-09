@@ -1,3 +1,5 @@
+use std::thread;
+
 use arrayvec::ArrayVec;
 use serialport::SerialPort;
 
@@ -19,17 +21,20 @@ impl<T: SerialPort> Device<T> {
     }
 
     // for now test command to read device information
-    fn send_message(&mut self) -> ArrayVec<u8, 261> {
+    pub fn send_message(&mut self) -> ArrayVec<u8, 261> {
         let mut ck: u8 = 0;
         ck = ck.wrapping_add(self.slave_adress);
-        ck = ck.wrapping_add(0xD0);
-        ck = ck.wrapping_add(0x01);
-        ck = ck.wrapping_add(0x01);
-        ck ^= 0xFF;
-        let messgae = [0x7E, self.slave_adress, 0xD0, 0x01, ck, 0x7E];
+        ck = ck.wrapping_add(0xD0_u8);
+        ck = ck.wrapping_add(0x01_u8);
+        ck = ck.wrapping_add(0x01_u8);
+        ck ^= 0xFF_u8;
+        let messgae: &[u8] = &[0x7E_u8.to_be(), self.slave_adress.to_be(), 0xD0_u8.to_be(), 0x01_u8.to_be(), 0x01_u8.to_be(), ck.to_be, 0x7E_u8.to_be()];
 
-        let _ = self.port.write(&messgae).unwrap();
+        let s = self.port.write(messgae).unwrap();
+        println!("wrote {} bytes", s);
         let mut out = ArrayVec::new();
+
+        thread::sleep(std::time::Duration::from_millis(100));
         
         let size = self.port.read(&mut out).unwrap();
         assert_eq!(size, out.len());
