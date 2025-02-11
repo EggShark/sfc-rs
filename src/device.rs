@@ -26,9 +26,9 @@ impl<T: SerialPort> Device<T> {
         ck = ck.wrapping_add(self.slave_adress);
         ck = ck.wrapping_add(0xD0_u8);
         ck = ck.wrapping_add(0x01);
-        ck = ck.wrapping_add(0x03);
+        ck = ck.wrapping_add(0x01);
         ck ^= 0xFF_u8;
-        let messgae: &[u8] = &[0x7E_u8, self.slave_adress, 0xD0_u8, 0x01_u8, 0x03_u8, ck, 0x7E_u8];
+        let messgae: &[u8] = &[0x7E_u8, self.slave_adress, 0xD0_u8, 0x01_u8, 0x01_u8, ck, 0x7E_u8];
 
         let s = self.port.write(messgae).unwrap();
         println!("wrote {} bytes", s);
@@ -38,9 +38,7 @@ impl<T: SerialPort> Device<T> {
         let mut idx = 0;
         loop {
             let s = self.port.read(&mut buff).unwrap();
-            for i in 0..s {
-                out[i+idx] = buff[i];
-            }
+            out[idx..(s+idx)].copy_from_slice(&buff[..s]);
             if buff[s-1] == 0x7E && idx !=0 {
                 break;
             } 
