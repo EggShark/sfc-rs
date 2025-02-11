@@ -11,7 +11,7 @@ pub struct Device<T: SerialPort> {
 
 impl<T: SerialPort> Device<T> {
     pub fn new(mut serial_port: T, slave_adress: u8) -> Self {
-        let _ = serial_port.set_timeout(std::time::Duration::from_millis(200));
+        let _ = serial_port.set_timeout(std::time::Duration::from_millis(400));
 
         Self {
             port: serial_port,
@@ -21,23 +21,38 @@ impl<T: SerialPort> Device<T> {
     }
 
     // for now test command to read device information
-    pub fn send_message(&mut self) -> ArrayVec<u8, 261> {
+    pub fn send_message(&mut self) -> [u8; 256] {
         let mut ck: u8 = 0;
         ck = ck.wrapping_add(self.slave_adress);
         ck = ck.wrapping_add(0xD0_u8);
-        ck = ck.wrapping_add(0x01_u8);
-        ck = ck.wrapping_add(0x01_u8);
+        ck = ck.wrapping_add(0x01);
+        ck = ck.wrapping_add(0x03);
         ck ^= 0xFF_u8;
-        let messgae: &[u8] = &[0x7E_u8.to_be(), self.slave_adress.to_be(), 0xD0_u8.to_be(), 0x01_u8.to_be(), 0x01_u8.to_be(), ck.to_be, 0x7E_u8.to_be()];
+        let messgae: &[u8] = &[0x7E_u8, self.slave_adress, 0xD0_u8, 0x01_u8, 0x03_u8, ck, 0x7E_u8];
 
         let s = self.port.write(messgae).unwrap();
         println!("wrote {} bytes", s);
-        let mut out = ArrayVec::new();
 
-        thread::sleep(std::time::Duration::from_millis(100));
-        
-        let size = self.port.read(&mut out).unwrap();
-        assert_eq!(size, out.len());
+        let mut buff = [0_u8; 20];
+        let mut out = [0_u8; 256];
+        let mut idx = 0;
+        loop {
+            let s = self.port.read(&mut buff).unwrap();
+            for i in 0..s {
+                out[i+idx] = buff[i];
+            }
+            if buff[s-1] == 0x7E && idx !=0 {
+                break;
+            } 
+            idx += s;
+        }
+        // let first = self.port.read_u8();
+        // println!("{:?}", first)
+        // let size = self.port.read(&mut out).unwrap();
+        // println!("{:?}", out);
+        // let mut out = [0_u8; 256];
+        // let size = self.port.read(&mut out).unwrap();
+        // println!("{:?}", out);
         out
     }
 }
