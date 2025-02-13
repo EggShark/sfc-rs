@@ -1,4 +1,4 @@
-use std::thread;
+use std::{thread, usize};
 
 use arrayvec::ArrayVec;
 use serialport::SerialPort;
@@ -26,9 +26,9 @@ impl<T: SerialPort> Device<T> {
         ck = ck.wrapping_add(self.slave_adress);
         ck = ck.wrapping_add(0xD0_u8);
         ck = ck.wrapping_add(0x01);
-        ck = ck.wrapping_add(0x01);
+        ck = ck.wrapping_add(0x03);
         ck ^= 0xFF_u8;
-        let messgae: &[u8] = &[0x7E_u8, self.slave_adress, 0xD0_u8, 0x01_u8, 0x01_u8, ck, 0x7E_u8];
+        let messgae: &[u8] = &[0x7E_u8, self.slave_adress, 0xD0_u8, 0x01_u8, 0x03_u8, ck, 0x7E_u8];
 
         let s = self.port.write(messgae).unwrap();
         println!("wrote {} bytes", s);
@@ -38,12 +38,19 @@ impl<T: SerialPort> Device<T> {
         let mut idx = 0;
         loop {
             let s = self.port.read(&mut buff).unwrap();
-            out[idx..(s+idx)].copy_from_slice(&buff[..s]);
-            if buff[s-1] == 0x7E && idx !=0 {
+            out[idx..(idx+s)].copy_from_slice(&buff[..s]);
+            println!("{:#02x}, {}, {:?}", buff[s-1], s, &buff[..s]);
+            if buff[s-1] == 0x7E && (s > 1 || idx > 0) {
                 break;
-            } 
+            }
             idx += s;
         }
+        let data_len = out[4] as usize;
+        // for i in 5..5+data_len {
+        //    out[i] = out[i].reverse_bits();
+        // }
+        let test = String::from_utf8_lossy(&out[5..5+data_len]);
+        println!("{}", test);
         // let first = self.port.read_u8();
         // println!("{:?}", first)
         // let size = self.port.read(&mut out).unwrap();

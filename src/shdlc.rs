@@ -13,8 +13,22 @@ pub struct MOSIFrame {
     address: u8,
     command: u8,
     data_length: u8,
-    data: [u8; 255],
+    raw: ArrayVec<u8, 518>,
     checksum: u8,
+}
+
+impl MOSIFrame {
+    pub fn new(address: u8, command: u8, data: &[u8]) -> Self {
+        let data_length = data.len() as u8;
+        let raw = to_shdlc(command, data_length, data).unwrap();
+        Self {
+            address,
+            command,
+            data_length,
+            raw,
+            checksum: 0,
+        }
+    }
 }
 
 pub struct MISOFrame {
@@ -25,30 +39,40 @@ pub struct MISOFrame {
     checksum: u8,
 }
 
-pub fn calculate_check_sum(frame: &MOSIFrame) -> u8 {
-    let mut sum: u8 = 0;
-    sum = sum.wrapping_add(frame.address);
-    sum = sum.wrapping_add(frame.command);
-    sum = sum.wrapping_add(frame.data_length);
-    for idx in 0..frame.data_length as usize {
-       sum = sum.wrapping_add(frame.data[idx]); 
-    }
-    sum ^= 0xFF;
-
-    sum
+pub fn calculate_check_sum(frame: &[u8]) -> u8 {
+    frame[1..].iter().fold(0_u8, |acc, x| acc.wrapping_add(*x)) ^ 0xFF_u8
 }
 
-pub fn to_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 256>, TranslationError> {
+pub fn to_shdlc(command: u8, data_len: u8, data: &[u8]) -> Result<ArrayVec<u8, 518>, TranslationError> {
     let mut out = ArrayVec::new();
-    if data.len() > 256 {
+    out.push(START_STOP);
+    out.push(command);
+    
+    match data_len {
+        START_STOP => {
+            out.push(ESCAPE);
+            out.push(START_SWAP);
+        }
+        ESCAPE => {
+            out.push(ESCAPE);
+            out.push(ESCAPE_SWAP);
+        }
+        XON => {
+            out.push(ESCAPE);
+            out.push(XON_SWAP);
+        }
+        XOFF => {
+            out.push(ESCAPE);
+            out.push(XOFF_SWAP);
+        }
+        _ => out.push(data_len),
+    }
+
+    if data.len() > 255 {
         Err(TranslationError::DataTooLarge)?;
     }
 
     for &b in data {
-        if out.len() == 255 {
-            Err(TranslationError::DataTooLarge)?;
-        }
-
         match b {
             START_STOP => {
                 out.push(ESCAPE);
@@ -69,6 +93,10 @@ pub fn to_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 256>, TranslationError> {
             _ => out.push(b)
         }
     }
+    let checksum = calculate_check_sum(&out);
+    out.push(checksum);
+
+    out.push(START_STOP);
 
     Ok(out)
 }
@@ -95,8 +123,28 @@ pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 256>, TranslationError> {
     Ok(out)
 }
 
+#[derive(Debug)]
 pub enum TranslationError {
     DataTooLarge,
     MissingEscapedData,
     FrameEndInData,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::calculate_check_sum;
+
+    #[test]
+    fn one_two_three() {
+        let data = [0, 1, 2, 3, 4, 5, 6];
+        let ck = calculate_check_sum(&data);
+        assert_eq!(ck, 234);
+    }
+
+    #[test]
+    fn check_sum_over_flow() {
+        let data = [0, 200, 201, 202];
+        let ck = calculate_check_sum(&data);
+        assert_eq!(ck, 164);
+    }
 }
