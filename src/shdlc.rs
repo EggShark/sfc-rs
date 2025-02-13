@@ -29,14 +29,38 @@ impl MOSIFrame {
             checksum: 0,
         }
     }
+
+    pub fn into_raw(self) -> ArrayVec<u8, 518> {
+        self.raw
+    }
 }
 
 pub struct MISOFrame {
     address: u8,
     command: u8,
     data_length: u8,
-    data: [u8; 255],
+    state: u8,
+    data: ArrayVec<u8, 262>,
     checksum: u8,
+}
+
+impl MISOFrame {
+    pub fn from_bytes(data: &[u8]) -> Self {
+        let decoded = from_shdlc(data).unwrap();
+        let address = decoded[1];
+        let command = decoded[2];
+        let state = decoded[3];
+        let data_length = decoded[4];
+        let checksum = decoded[decoded.len() - 2];
+        Self {
+            address,
+            command,
+            data_length,
+            state,
+            data: decoded,
+            checksum
+        }
+    }
 }
 
 pub fn calculate_check_sum(frame: &[u8]) -> u8 {
@@ -101,7 +125,7 @@ pub fn to_shdlc(command: u8, data_len: u8, data: &[u8]) -> Result<ArrayVec<u8, 5
     Ok(out)
 }
 
-pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 256>, TranslationError> {
+pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 262>, TranslationError> {
     let mut out = ArrayVec::new();
 
     let mut iter = data.iter();
