@@ -159,6 +159,13 @@ mod tests {
     use super::calculate_check_sum;
 
     #[test]
+    fn from_guide() {
+        let data = [0, 0x02, 0x43, 0x04, 0x64, 0xA0, 0x22, 0xFC];
+        let ck = calculate_check_sum(&data);
+        assert_eq!(ck, 0x94);
+    }
+
+    #[test]
     fn one_two_three() {
         let data = [0, 1, 2, 3, 4, 5, 6];
         let ck = calculate_check_sum(&data);

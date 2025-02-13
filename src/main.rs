@@ -4,6 +4,6 @@ fn main() {
     let test_port = serialport::new("/dev/ttyUSB0", 115200).open_native().unwrap();
 
     let mut device = Device::new(test_port, 0);
-    let out = device.send_message();
+    let out = device.get_serial_number();
     println!("{:?}", out);
 }
