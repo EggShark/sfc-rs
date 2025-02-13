@@ -1,7 +1,7 @@
-use std::{thread, usize};
-
 use arrayvec::ArrayVec;
 use serialport::SerialPort;
+
+use crate::shdlc::{MISOFrame, MOSIFrame};
 
 pub struct Device<T: SerialPort> {
     port: T,
@@ -20,19 +20,19 @@ impl<T: SerialPort> Device<T> {
         }
     }
 
+    pub fn get_serial_number(&mut self) -> String {
+        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x03]);
+
+        let _ = self.port.write(&frame.into_raw()).unwrap();
+        let response = self.read_response();
+        println!("{:?}", response);
+
+
+        todo!();
+    }
+
     // for now test command to read device information
-    pub fn send_message(&mut self) -> ArrayVec<u8, 518> {
-        let mut ck: u8 = 0;
-        ck = ck.wrapping_add(self.slave_adress);
-        ck = ck.wrapping_add(0xD0_u8);
-        ck = ck.wrapping_add(0x01);
-        ck = ck.wrapping_add(0x03);
-        ck ^= 0xFF_u8;
-        let messgae: &[u8] = &[0x7E_u8, self.slave_adress, 0xD0_u8, 0x01_u8, 0x03_u8, ck, 0x7E_u8];
-
-        let s = self.port.write(messgae).unwrap();
-        println!("wrote {} bytes", s);
-
+    pub fn read_response(&mut self) -> ArrayVec<u8, 518> {
         let mut buff = [0_u8; 20];
         let mut out = ArrayVec::<u8, 518>::new();
         loop {
@@ -42,19 +42,7 @@ impl<T: SerialPort> Device<T> {
                 break;
             }
         }
-        let data_len = out[4] as usize;
-        // for i in 5..5+data_len {
-        //    out[i] = out[i].reverse_bits();
-        // }
-        let test = String::from_utf8_lossy(&out[5..5+data_len]);
-        println!("{}", test);
-        // let first = self.port.read_u8();
-        // println!("{:?}", first)
-        // let size = self.port.read(&mut out).unwrap();
-        // println!("{:?}", out);
-        // let mut out = [0_u8; 256];
-        // let size = self.port.read(&mut out).unwrap();
-        // println!("{:?}", out);
+
         out
     }
 }
