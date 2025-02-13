@@ -21,7 +21,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     // for now test command to read device information
-    pub fn send_message(&mut self) -> [u8; 256] {
+    pub fn send_message(&mut self) -> ArrayVec<u8, 518> {
         let mut ck: u8 = 0;
         ck = ck.wrapping_add(self.slave_adress);
         ck = ck.wrapping_add(0xD0_u8);
@@ -34,16 +34,13 @@ impl<T: SerialPort> Device<T> {
         println!("wrote {} bytes", s);
 
         let mut buff = [0_u8; 20];
-        let mut out = [0_u8; 256];
-        let mut idx = 0;
+        let mut out = ArrayVec::<u8, 518>::new();
         loop {
             let s = self.port.read(&mut buff).unwrap();
-            out[idx..(idx+s)].copy_from_slice(&buff[..s]);
-            println!("{:#02x}, {}, {:?}", buff[s-1], s, &buff[..s]);
-            if buff[s-1] == 0x7E && (s > 1 || idx > 0) {
+            out.try_extend_from_slice(&buff[..s]).unwrap();
+            if buff[s-1] == 0x7E && (s > 1 || out.len() > 1) {
                 break;
             }
-            idx += s;
         }
         let data_len = out[4] as usize;
         // for i in 5..5+data_len {
