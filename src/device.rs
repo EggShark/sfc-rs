@@ -1,3 +1,5 @@
+use std::ffi::CString;
+
 use arrayvec::ArrayVec;
 use serialport::SerialPort;
 
@@ -29,9 +31,10 @@ impl<T: SerialPort> Device<T> {
         println!("{:?}", response);
         let parsed = MISOFrame::from_bytes(&response);
         println!("{:?}", parsed);
+        let string = CString::from_vec_with_nul(parsed.into_data().to_vec()).unwrap().into_string().unwrap();
+        println!("{:?}", string);
 
-
-        todo!();
+        string
     }
 
     // for now test command to read device information

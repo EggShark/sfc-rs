@@ -81,6 +81,10 @@ impl MISOFrame {
         ck ^= 0xFF;
         ck == self.checksum
     }
+
+    pub fn into_data(self) -> ArrayVec<u8, 255> {
+        self.data
+    }
 }
 
 pub fn calculate_check_sum(frame: &[u8]) -> u8 {
