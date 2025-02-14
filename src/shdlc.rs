@@ -20,7 +20,7 @@ pub struct MOSIFrame {
 impl MOSIFrame {
     pub fn new(address: u8, command: u8, data: &[u8]) -> Self {
         let data_length = data.len() as u8;
-        let raw = to_shdlc(command, data_length, data).unwrap();
+        let raw = to_shdlc(address, command, data_length, data).unwrap();
         Self {
             address,
             command,
@@ -67,9 +67,10 @@ pub fn calculate_check_sum(frame: &[u8]) -> u8 {
     frame[1..].iter().fold(0_u8, |acc, x| acc.wrapping_add(*x)) ^ 0xFF_u8
 }
 
-pub fn to_shdlc(command: u8, data_len: u8, data: &[u8]) -> Result<ArrayVec<u8, 518>, TranslationError> {
+pub fn to_shdlc(address: u8, command: u8, data_len: u8, data: &[u8]) -> Result<ArrayVec<u8, 518>, TranslationError> {
     let mut out = ArrayVec::new();
     out.push(START_STOP);
+    out.push(address);
     out.push(command);
     
     match data_len {
