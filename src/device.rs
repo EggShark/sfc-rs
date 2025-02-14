@@ -37,6 +37,14 @@ impl<T: SerialPort> Device<T> {
         string
     }
 
+    pub fn get_article_code(&mut self) -> String {
+        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x02]);
+        let _ = self.port.write(&frame.into_raw()).unwrap();
+        let response = self.read_response();
+        let parsed = MISOFrame::from_bytes(&response);
+        CString::from_vec_with_nul(parsed.into_data().to_vec()).unwrap().into_string().unwrap()
+    }
+
     // for now test command to read device information
     pub fn read_response(&mut self) -> ArrayVec<u8, 518> {
         let mut buff = [0_u8; 20];
