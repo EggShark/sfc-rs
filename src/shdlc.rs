@@ -35,31 +35,51 @@ impl MOSIFrame {
     }
 }
 
+#[derive(Debug)]
 pub struct MISOFrame {
     address: u8,
     command: u8,
     data_length: u8,
     state: u8,
-    data: ArrayVec<u8, 262>,
+    data: ArrayVec<u8, 255>,
     checksum: u8,
 }
+
 
 impl MISOFrame {
     pub fn from_bytes(data: &[u8]) -> Self {
         let decoded = from_shdlc(data).unwrap();
-        let address = decoded[1];
-        let command = decoded[2];
-        let state = decoded[3];
-        let data_length = decoded[4];
-        let checksum = decoded[decoded.len() - 2];
+        let address = decoded[0];
+        let command = decoded[1];
+        let state = decoded[2];
+        let data_length = decoded[3];
+        let checksum = decoded[decoded.len() - 1];
+        let mut data = ArrayVec::new();
+        let _ = data.try_extend_from_slice(&decoded[4..4+data_length as usize]);
+
         Self {
             address,
             command,
             data_length,
             state,
-            data: decoded,
+            data,
             checksum
         }
+    }
+
+    pub fn get_state(&self) -> u8 {
+        self.state
+    }
+
+    pub fn validate_check_sum(&self) -> bool {
+        let mut ck: u8 = 0;
+        ck = ck.wrapping_add(self.address);
+        ck = ck.wrapping_add(self.command);
+        ck = ck.wrapping_add(self.data_length);
+        ck = ck.wrapping_add(self.state);
+        ck = ck.wrapping_add(self.data.iter().fold(0, |acc, x| acc + acc.wrapping_add(*x)));
+        ck ^= 0xFF;
+        ck == self.checksum
     }
 }
 
@@ -129,7 +149,7 @@ pub fn to_shdlc(address: u8, command: u8, data_len: u8, data: &[u8]) -> Result<A
 pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 262>, TranslationError> {
     let mut out = ArrayVec::new();
 
-    let mut iter = data.iter();
+    let mut iter = data[1..data.len()-1].iter();
     
     while let Some(&byte) = iter.next() {
         match byte {
