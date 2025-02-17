@@ -23,16 +23,62 @@ impl<T: SerialPort> Device<T> {
         }
     }
 
+    pub fn get_product_type(&mut self) -> Result<String, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x00]);
+        let _ = self.port.write(&frame.into_raw())?;
+
+        let response = self.read_response()?;
+        let string = match CString::from_vec_with_nul(response.into_data().to_vec()) {
+            Ok(s) => match s.into_string() {
+                Ok(st) => st,
+                Err(_) => Err(DeviceError::InvalidString)?,
+            },
+            Err(_) => Err(DeviceError::InvalidString)?,
+        };
+
+        Ok(string)
+    }
+
+    pub fn get_product_name(&mut self) -> Result<String, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x01]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let response = self.read_response()?;
+        let string = match CString::from_vec_with_nul(response.into_data().to_vec()) {
+            Ok(s) => match s.into_string() {
+                Ok(st) => st,
+                Err(_) => Err(DeviceError::InvalidString)?,
+            },
+            Err(_) => Err(DeviceError::InvalidString)?,
+        };
+
+        Ok(string)
+
+    }
+
+    pub fn get_article_code(&mut self) -> Result<String, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x02]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let response = self.read_response()?;
+        let string = match CString::from_vec_with_nul(response.into_data().to_vec()) {
+            Ok(s) => match s.into_string() {
+                Ok(st) => st,
+                Err(_) => Err(DeviceError::InvalidString)?,
+            },
+            Err(_) => Err(DeviceError::InvalidString)?,
+        };
+
+        Ok(string)
+
+    }
+
     pub fn get_serial_number(&mut self) -> Result<String, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x03]);
         let data = frame.into_raw();
 
-        let _ = self.port.write(&data).unwrap();
+        let _ = self.port.write(&data)?;
         let response = self.read_response()?;
 
-        let parsed = MISOFrame::from_bytes(&response);
-
-        let string = CString::from_vec_with_nul(parsed.into_data().to_vec());
+        let string = CString::from_vec_with_nul(response.into_data().to_vec());
         let string = match string {
             Ok(s) => match s.into_string() {
                 Ok(st) => st,
@@ -44,25 +90,10 @@ impl<T: SerialPort> Device<T> {
         Ok(string)
     }
 
-    pub fn get_article_code(&mut self) -> Result<String, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x02]);
-        let _ = self.port.write(&frame.into_raw()).unwrap();
-        let response = self.read_response()?;
-        let parsed = MISOFrame::from_bytes(&response);
-        let string = match CString::from_vec_with_nul(parsed.into_data().to_vec()) {
-            Ok(s) => match s.into_string() {
-                Ok(st) => st,
-                Err(_) => Err(DeviceError::InvalidString)?,
-            },
-            Err(_) => Err(DeviceError::InvalidString)?,
-        };
-
-        Ok(string)
-
-    }
+    
 
     // for now test command to read device information
-    pub fn read_response(&mut self) -> Result<ArrayVec<u8, 518>, DeviceError> {
+    pub fn read_response(&mut self) -> Result<MISOFrame, DeviceError> {
         let mut buff = [0_u8; 20];
         let mut out = ArrayVec::<u8, 518>::new();
         loop {
@@ -78,7 +109,7 @@ impl<T: SerialPort> Device<T> {
             Err(DeviceError::InvalidChecksum(frame.get_checksum(), frame.calculate_check_sum()))?
         }
 
-        Ok(out)
+        Ok(frame)
     }
 }
 
@@ -126,5 +157,64 @@ impl From<std::io::Error> for DeviceError {
 impl From<TranslationError> for DeviceError {
     fn from(value: TranslationError) -> Self {
         Self::ShdlcError(value)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use serial_test::serial;
+
+    #[cfg(target_os="linux")]
+    use serialport::TTYPort;
+    #[cfg(target_os="windows")]
+    use serialport::COMPort;
+
+    
+    #[cfg(target_os="linux")]
+    const PORT: &str = "/dev/ttyUSB0";
+    #[cfg(target_os="windows")]
+    const PORT: &str = "COM4";
+
+    use super::Device;
+
+    #[cfg(target_os="linux")]
+    type SP = TTYPort;
+
+    fn create_device() -> Device<SP> {
+        let test_port = serialport::new(PORT, 115200).open_native().unwrap();
+        Device::new(test_port, 0)
+    }
+
+    #[test]
+    #[serial]
+    fn product_type() {
+        let mut device = create_device();
+        let pt = device.get_product_type().unwrap();
+        println!("Product type: {}", pt);
+    }
+
+    #[test]
+    #[serial]
+    fn product_name() {
+        let mut device = create_device();
+        let pn = device.get_product_name().unwrap();
+        println!("Product name: {}", pn);
+    }
+
+    #[test]
+    #[serial]
+    fn article_code() {
+        let mut device = create_device();
+        let ac = device.get_article_code().unwrap();
+        println!("Article code: {}", ac);
+    }
+
+    #[test]
+    #[serial]
+    fn serial_number() {
+        let mut device = create_device();
+        let sn = device.get_serial_number().unwrap();
+        println!("Serial number: {}", sn);
     }
 }
