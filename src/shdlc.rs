@@ -69,6 +69,10 @@ impl MISOFrame {
         }
     }
 
+    pub fn is_ok(&self) -> bool {
+        self.state == 0
+    }
+
     pub fn get_state(&self) -> u8 {
         self.state
     }

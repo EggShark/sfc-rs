@@ -40,7 +40,11 @@ impl<T: SerialPort> Device<T> {
     pub fn set_baudrate(&mut self, baudrate: u32) -> Result<(), DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x91, &baudrate.to_be_bytes());
         let _ = self.port.write(&frame.into_raw())?;
-        let _ = self.read_response()?;
+        let res = self.read_response()?;
+        if !res.is_ok() {
+            println!("{:#010b}", res.get_state());
+            Err(DeviceError::InvalidDataSent)?;
+        }
 
         Ok(())
     }
@@ -157,6 +161,7 @@ pub enum DeviceError {
     ShdlcError(TranslationError),
     InvalidChecksum(u8, u8),
     InvalidString,
+    InvalidDataSent,
 }
 
 impl Display for DeviceError {
@@ -165,7 +170,8 @@ impl Display for DeviceError {
             Self::IoError(e) => e.fmt(f),
             Self::ShdlcError(e) => e.fmt(f),
             Self::InvalidChecksum(recived, expected) => write!(f, "checksum recived: {:#02x} did not match expected value: {:#02x}", recived, expected),
-            Self::InvalidString => write!(f, "invalid string data found")
+            Self::InvalidString => write!(f, "invalid string data found"),
+            Self::InvalidDataSent => write!(f, "the data sent to the device is not allowed for that command"),
         }
     }
 }
@@ -198,7 +204,7 @@ mod tests {
     #[cfg(target_os="windows")]
     const PORT: &str = "COM4";
 
-    use super::Device;
+    use super::*;
 
     #[cfg(target_os="linux")]
     type SP = TTYPort;
@@ -266,5 +272,16 @@ mod tests {
         let br = device.get_baudrate().unwrap();
         device.set_baudrate(115200).unwrap();
         assert_eq!(br, 57600);
+    }
+
+    #[test]
+    #[serial]
+    fn set_invalid_buadrate() {
+        let mut device = create_device();
+        let res = device.set_baudrate(57601);
+        match res {
+            Err(DeviceError::InvalidDataSent) => {},
+            _ => panic!("expected, DeviceError::InvalidDataSent"),
+        }
     }
 }
