@@ -23,6 +23,28 @@ impl<T: SerialPort> Device<T> {
         }
     }
 
+    pub fn get_baudrate(&mut self) -> Result<u32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x91, &[]);
+        let _ = self.port.write(&frame.into_raw())?;
+
+        let response = self.read_response()?;
+        let data = response.into_data();
+        if data.len() < 4 {
+            panic!("WOOOW not enough bytes");
+        }
+        let res = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+
+        Ok(res)
+    }
+
+    pub fn set_baudrate(&mut self, baudrate: u32) -> Result<(), DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x91, &baudrate.to_be_bytes());
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+
+        Ok(())
+    }
+
     pub fn get_product_type(&mut self) -> Result<String, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x00]);
         let _ = self.port.write(&frame.into_raw())?;
@@ -216,5 +238,33 @@ mod tests {
         let mut device = create_device();
         let sn = device.get_serial_number().unwrap();
         println!("Serial number: {}", sn);
+    }
+
+    #[test]
+    #[serial]
+    fn get_baudrate() {
+        let mut device = create_device();
+        let br = device.get_baudrate().unwrap();
+        assert_eq!(br, 115200);
+    }
+
+    #[test]
+    #[serial]
+    fn set_baudrate() {
+        let mut device = create_device();
+        device.set_baudrate(115200).unwrap();
+    }
+
+    #[test]
+    #[serial]
+    fn set_and_read_buadrate() {
+        let mut device = create_device();
+        device.set_baudrate(57600).unwrap();
+        drop(device);
+        let test_port = serialport::new(PORT, 57600).open_native().unwrap();
+        let mut device = Device::new(test_port, 0);
+        let br = device.get_baudrate().unwrap();
+        device.set_baudrate(115200).unwrap();
+        assert_eq!(br, 57600);
     }
 }
