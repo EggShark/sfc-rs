@@ -9,8 +9,8 @@ fn main() {
     let test_port = serialport::new(PORT, 115200).open_native().unwrap();
 
     let mut device = Device::new(test_port, 0);
-    let out = device.get_serial_number();
-    let oo = device.get_article_code();
+    let out = device.get_serial_number().unwrap();
+    let oo = device.get_article_code().unwrap();
     println!("{:?}", out);
     println!("{:?}", oo);
 }

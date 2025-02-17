@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use arrayvec::ArrayVec;
 
 pub const START_STOP: u8 = 0x7E;
@@ -71,15 +73,23 @@ impl MISOFrame {
         self.state
     }
 
-    pub fn validate_check_sum(&self) -> bool {
+    pub fn get_checksum(&self) -> u8 {
+        self.checksum
+    }
+
+    pub fn calculate_check_sum(&self) -> u8 {
         let mut ck: u8 = 0;
         ck = ck.wrapping_add(self.address);
         ck = ck.wrapping_add(self.command);
         ck = ck.wrapping_add(self.data_length);
         ck = ck.wrapping_add(self.state);
-        ck = ck.wrapping_add(self.data.iter().fold(0, |acc, x| acc + acc.wrapping_add(*x)));
+        ck = ck.wrapping_add(self.data.iter().fold(0, |acc, x| acc.wrapping_add(*x)));
         ck ^= 0xFF;
-        ck == self.checksum
+        ck
+    }
+
+    pub fn validate_checksum(&self) -> bool {
+       self.calculate_check_sum() == self.checksum
     }
 
     pub fn into_data(self) -> ArrayVec<u8, 255> {
@@ -162,7 +172,8 @@ pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 262>, TranslationError> {
                 Some(0x5D) => out.push(ESCAPE),
                 Some(0x31) => out.push(XON),
                 Some(0x33) => out.push(XOFF),
-                _ => Err(TranslationError::MissingEscapedData)?,
+                Some(b) => Err(TranslationError::MissingEscapedData(*b))?,
+                None => Err(TranslationError::MissingEscapedData(0))?,
             }
             START_STOP => Err(TranslationError::FrameEndInData)?,
             _ => out.push(byte),
@@ -172,12 +183,23 @@ pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 262>, TranslationError> {
     Ok(out)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TranslationError {
     DataTooLarge,
-    MissingEscapedData,
+    MissingEscapedData(u8),
     FrameEndInData,
 }
+
+impl Display for TranslationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DataTooLarge => write!(f, "data Exceeded maxium length of 256"),
+            Self::FrameEndInData => write!(f, "the frame end byte ({:#02x}) was found inside the data", START_STOP),
+            Self::MissingEscapedData(b) => write!(f, "the escape byte ({:#02x}) was placed before an invalid escaped byte: ({:#02x})", ESCAPE, b),
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
