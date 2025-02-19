@@ -23,6 +23,50 @@ impl<T: SerialPort> Device<T> {
         }
     }
 
+    pub fn get_setpoint(&mut self) -> Result<f32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let res = self.read_response()?;
+        let data = res.into_data();
+        if data.len() < 4 {
+            panic!("WOOOW not enough bytes");
+        }
+
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn set_setpoint(&mut self, setpoint: f32) -> Result<(), DeviceError> {
+        let setpoint_bytes = setpoint.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+        Ok(())
+    }
+
+    pub fn read_measured_value(&mut self) -> Result<f32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x08, &[0x01]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let res = self.read_response()?;
+        let data = res.into_data();
+        if data.len() < 4 {
+            panic!("WOOOW not eough bytes");
+        }
+
+        Ok(f32::from_be_bytes([data[0],data[1],data[2],data[3]]))
+    }
+
+    pub fn read_average_measured_value(&mut self, measurment_count: u8) -> Result<f32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x08, &[measurment_count]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let res = self.read_response()?;
+        let data = res.into_data();
+        if data.len() < 4 {
+            panic!("WOOOOW not enough bytes");
+        }
+
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
     pub fn get_baudrate(&mut self) -> Result<u32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x91, &[]);
         let _ = self.port.write(&frame.into_raw())?;
@@ -40,10 +84,7 @@ impl<T: SerialPort> Device<T> {
     pub fn set_baudrate(&mut self, baudrate: u32) -> Result<(), DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x91, &baudrate.to_be_bytes());
         let _ = self.port.write(&frame.into_raw())?;
-        let res = self.read_response()?;
-        if !res.is_ok() {
-            Err(StateResponseError::from(res.get_state()))?;
-        }
+        let _ = self.read_response()?;
 
         self.port.set_baud_rate(baudrate)?;
 
@@ -132,8 +173,13 @@ impl<T: SerialPort> Device<T> {
         }
 
         let frame = MISOFrame::from_bytes(&out);
+
+        if !frame.is_ok() {
+            Err(StateResponseError::from(frame.get_state()))?;
+        }
+
         if !frame.validate_checksum() {
-            Err(DeviceError::InvalidChecksum(frame.get_checksum(), frame.calculate_check_sum()))?
+            Err(DeviceError::InvalidChecksum(frame.get_checksum(), frame.calculate_check_sum()))?;
         }
 
         Ok(frame)
