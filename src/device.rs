@@ -45,6 +45,8 @@ impl<T: SerialPort> Device<T> {
             Err(StateResponseError::from(res.get_state()))?;
         }
 
+        self.port.set_baud_rate(baudrate)?;
+
         Ok(())
     }
 
@@ -159,6 +161,7 @@ pub enum DeviceError {
     IoError(std::io::Error),
     ShdlcError(TranslationError),
     StateResponse(StateResponseError),
+    PortError(serialport::Error),
     InvalidChecksum(u8, u8),
     InvalidString,
 }
@@ -169,6 +172,7 @@ impl Display for DeviceError {
             Self::IoError(e) => e.fmt(f),
             Self::ShdlcError(e) => e.fmt(f),
             Self::StateResponse(e) => e.fmt(f),
+            Self::PortError(e) => e.fmt(f),
             Self::InvalidChecksum(recived, expected) => write!(f, "checksum recived: {:#02x} did not match expected value: {:#02x}", recived, expected),
             Self::InvalidString => write!(f, "invalid string data found"),
         }
@@ -190,6 +194,12 @@ impl From<TranslationError> for DeviceError {
 impl From<StateResponseError> for DeviceError {
     fn from(value: StateResponseError) -> Self {
         Self::StateResponse(value)
+    }
+}
+
+impl From<serialport::Error> for DeviceError {
+    fn from(value: serialport::Error) -> Self {
+        Self::PortError(value)
     }
 }
 
@@ -326,9 +336,6 @@ mod tests {
     fn set_and_read_buadrate() {
         let mut device = create_device();
         device.set_baudrate(57600).unwrap();
-        drop(device);
-        let test_port = serialport::new(PORT, 57600).open_native().unwrap();
-        let mut device = Device::new(test_port, 0);
         let br = device.get_baudrate().unwrap();
         device.set_baudrate(115200).unwrap();
         assert_eq!(br, 57600);
