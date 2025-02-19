@@ -42,8 +42,7 @@ impl<T: SerialPort> Device<T> {
         let _ = self.port.write(&frame.into_raw())?;
         let res = self.read_response()?;
         if !res.is_ok() {
-            println!("{:#010b}", res.get_state());
-            Err(DeviceError::InvalidDataSent)?;
+            Err(StateResponseError::from(res.get_state()))?;
         }
 
         Ok(())
@@ -159,9 +158,9 @@ pub enum ValveInputSource {
 pub enum DeviceError {
     IoError(std::io::Error),
     ShdlcError(TranslationError),
+    StateResponse(StateResponseError),
     InvalidChecksum(u8, u8),
     InvalidString,
-    InvalidDataSent,
 }
 
 impl Display for DeviceError {
@@ -169,9 +168,9 @@ impl Display for DeviceError {
         match self {
             Self::IoError(e) => e.fmt(f),
             Self::ShdlcError(e) => e.fmt(f),
+            Self::StateResponse(e) => e.fmt(f),
             Self::InvalidChecksum(recived, expected) => write!(f, "checksum recived: {:#02x} did not match expected value: {:#02x}", recived, expected),
             Self::InvalidString => write!(f, "invalid string data found"),
-            Self::InvalidDataSent => write!(f, "the data sent to the device is not allowed for that command"),
         }
     }
 }
@@ -185,6 +184,12 @@ impl From<std::io::Error> for DeviceError {
 impl From<TranslationError> for DeviceError {
     fn from(value: TranslationError) -> Self {
         Self::ShdlcError(value)
+    }
+}
+
+impl From<StateResponseError> for DeviceError {
+    fn from(value: StateResponseError) -> Self {
+        Self::StateResponse(value)
     }
 }
 
@@ -335,8 +340,8 @@ mod tests {
         let mut device = create_device();
         let res = device.set_baudrate(57601);
         match res {
-            Err(DeviceError::InvalidDataSent) => {},
-            _ => panic!("expected, DeviceError::InvalidDataSent"),
+            Err(DeviceError::StateResponse(StateResponseError::ParameterError)) => {},
+            _ => panic!("expected, StateResponseError::ParameterError"),
         }
     }
 }
