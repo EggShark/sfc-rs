@@ -188,6 +188,61 @@ impl From<TranslationError> for DeviceError {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum StateResponseError {
+    DataSizeError,
+    UnknownCommand,
+    ParameterError,
+    I2CNackError,
+    I2CMasterHoldError,
+    CRCError,
+    DataWriteError,
+    MeasureLoopNotRunning,
+    InvalidCalibration,
+    SensorBusy,
+    CommandNotAllowed,
+    FatalError,
+}
+
+impl From<u8> for StateResponseError {
+    fn from(value: u8) -> Self {
+        match value {
+            0x01 => Self::DataSizeError,
+            0x02 => Self::UnknownCommand,
+            0x04 => Self::ParameterError,
+            0x29 => Self::I2CNackError,
+            0x2A => Self::I2CMasterHoldError,
+            0x2B => Self::CRCError,
+            0x2C => Self::DataWriteError,
+            0x2D => Self::MeasureLoopNotRunning,
+            0x33 => Self::InvalidCalibration,
+            0x42 => Self::SensorBusy,
+            0x32 => Self::CommandNotAllowed,
+            0x7F => Self::FatalError,
+            _ => Self::FatalError
+        }
+    }
+}
+
+impl Display for StateResponseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DataSizeError => write!(f, "illegal data size of MOSI frame or invalid frame"),
+            Self::UnknownCommand => write!(f, "the device does not support or know this command"),
+            Self::ParameterError => write!(f, "the sent parameter was out of range"),
+            Self::I2CNackError => write!(f, "NACK recived from the I2C device"),
+            Self::I2CMasterHoldError => write!(f, "master hold not released from I2C device"),
+            Self::CRCError => write!(f, "checksum miss match occured"),
+            Self::DataWriteError => write!(f, "sensor data read back differs from written value"),
+            Self::MeasureLoopNotRunning => write!(f, "sensor mesaure loop not running or runs on wrong gas number"),
+            Self::InvalidCalibration => write!(f, "no valid gas calibration at given index"),
+            Self::SensorBusy => write!(f, "the sensor is busy at the moment, it takes 300ms to power-up after reset"),
+            Self::CommandNotAllowed => write!(f, "command is not allowed in the current state"),
+            Self::FatalError => write!(f, "an error without a specific code occured") 
+            // wow fatal error very specifc shdlc 
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
