@@ -201,6 +201,7 @@ impl Display for TranslationError {
 #[cfg(test)]
 mod tests {
     use super::calculate_check_sum;
+    use approx::relative_eq;
 
     #[test]
     fn from_guide() {

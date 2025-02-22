@@ -14,7 +14,7 @@ pub struct Device<T: SerialPort> {
 
 impl<T: SerialPort> Device<T> {
     pub fn new(mut serial_port: T, slave_adress: u8) -> Self {
-        serial_port.set_timeout(std::time::Duration::from_millis(400)).unwrap();
+        serial_port.set_timeout(std::time::Duration::from_millis(600)).unwrap();
 
         Self {
             port: serial_port,
@@ -395,6 +395,7 @@ impl Display for StateResponseError {
 #[cfg(test)]
 mod tests {
     use serial_test::serial;
+    use approx::assert_relative_eq;
 
     #[cfg(target_os="linux")]
     use serialport::TTYPort;
@@ -501,7 +502,7 @@ mod tests {
         let mut device = create_device();
         let r1 = device.read_measured_value().unwrap();
         let r2 = device.read_average_measured_value(50).unwrap();
-        println!("{}, {}", r1, r2);
+        println!("measured value: {}, average measured value: {}", r1, r2);
     }
 
     #[test]
@@ -520,6 +521,64 @@ mod tests {
     fn get_current_full_scale() {
         let mut device = create_device();
         let r1 = device.get_current_full_scale().unwrap();
-        println!("{}", r1);
+        println!("Current full scale {}", r1);
+    }
+
+    #[test]
+    #[serial]
+    fn set_setpoint_and_read_measured_value() {
+        let mut device = create_device();
+        let _ = device.set_setpoint_and_read_measured_value(1.5).unwrap();
+        let r2 = device.get_setpoint().unwrap();
+        device.set_setpoint(0.0).unwrap();
+
+        assert_relative_eq!(1.5, r2);
+    }
+
+    #[test]
+    #[serial]
+    fn get_set_controller_gain() {
+        let mut device = create_device();
+        let original = device.get_controller_gain().unwrap();
+        device.set_controller_gain(0.4).unwrap();
+        let r2 = device.get_controller_gain().unwrap();
+        device.set_controller_gain(original).unwrap();
+        assert_relative_eq!(0.4, r2, epsilon = 0.0001);
+    }
+
+    #[test]
+    #[serial]
+    fn get_set_intial_step() {
+        let mut device = create_device();
+        let original = device.get_initial_step().unwrap();
+        println!("intial step: {}", original);
+        device.set_initial_step(0.4).unwrap();
+        let r2 = device.get_initial_step().unwrap();
+        device.set_initial_step(original).unwrap();
+        assert_relative_eq!(0.4, r2);
+    }
+
+    #[test]
+    #[serial]
+    fn measure_raw_flow() {
+        let mut device = create_device();
+        let flow = device.measure_raw_flow().unwrap();
+        println!("raw flow: {}", flow);
+    }
+
+    #[test]
+    #[serial]
+    fn measure_raw_thermal_conductivity() {
+        let mut device = create_device();
+        let conductivity = device.measure_raw_thermal_conductivity().unwrap();
+        println!("raw thermal conductivity: {}", conductivity);
+    }
+
+    #[test]
+    #[serial]
+    fn measure_temperature() {
+        let mut device = create_device();
+        let temp = device.measure_temperature().unwrap();
+        println!("Temperature in C: {}", temp);
     }
 }
