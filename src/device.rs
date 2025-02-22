@@ -186,22 +186,6 @@ impl<T: SerialPort> Device<T> {
     }
 }
 
-#[repr(u8)]
-pub enum Scalling {
-    Normailized,
-    Physical,
-    UserDefined,
-}
-
-#[repr(u8)]
-pub enum ValveInputSource {
-    Controller,
-    ForceClosed,
-    ForceOpen,
-    Hold,
-    UserDefined = 16,
-}
-
 #[derive(Debug)]
 pub enum DeviceError {
     IoError(std::io::Error),
