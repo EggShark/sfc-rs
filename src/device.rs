@@ -29,7 +29,7 @@ impl<T: SerialPort> Device<T> {
         let res = self.read_response()?;
         let data = res.into_data();
         if data.len() < 4 {
-            panic!("WOOOW not enough bytes");
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
         }
 
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
@@ -50,7 +50,7 @@ impl<T: SerialPort> Device<T> {
         let res = self.read_response()?;
         let data = res.into_data();
         if data.len() < 4 {
-            panic!("WOOOW not eough bytes");
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
         }
 
         Ok(f32::from_be_bytes([data[0],data[1],data[2],data[3]]))
@@ -64,7 +64,98 @@ impl<T: SerialPort> Device<T> {
         let res = self.read_response()?;
         let data = res.into_data();
         if data.len() < 4 {
-            panic!("WOOOOW not enough bytes");
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn set_setpoint_and_read_measured_value(&mut self, setpoint: f32) -> Result<f32, DeviceError> {
+        let setpoint_bytes = setpoint.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_adress, 0x03, &[0x01, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let res = self.read_response()?;
+        let data = res.into_data();
+
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn get_controller_gain(&mut self) -> Result<f32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x00]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let res = self.read_response()?;
+        let data = res.into_data();
+
+        
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn set_controller_gain(&mut self, gain: f32) -> Result<(), DeviceError> {
+        let gain_bytes = gain.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x00, gain_bytes[0], gain_bytes[1], gain_bytes[2], gain_bytes[3]]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+        Ok(())
+    }
+
+    pub fn get_initial_step(&mut self) -> Result<f32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x03]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let res = self.read_response()?;
+        let data = res.into_data();
+        
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn set_initial_step(&mut self, step: f32) -> Result<(), DeviceError> {
+        let step_bytes = step.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x03, step_bytes[0], step_bytes[1], step_bytes[2], step_bytes[3]]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+        Ok(())
+    }
+
+    pub fn measure_raw_flow(&mut self) -> Result<u16, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x00]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 2 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+
+        Ok(u16::from_be_bytes([data[0], data[1]]))
+    }
+
+    pub fn measure_raw_thermal_conductivity(&mut self) -> Result<u16, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x02]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 2 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+
+        Ok(u16::from_be_bytes([data[0], data[1]]))
+    }
+
+    pub fn measure_temperature(&mut self) -> Result<f32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x10]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
         }
 
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))

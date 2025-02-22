@@ -181,6 +181,7 @@ pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 262>, TranslationError> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TranslationError {
     DataTooLarge,
+    NotEnoughData(u8, u8),
     MissingEscapedData(u8),
     FrameEndInData,
 }
@@ -190,6 +191,7 @@ impl Display for TranslationError {
         match self {
             Self::DataTooLarge => write!(f, "data Exceeded maxium length of 256"),
             Self::FrameEndInData => write!(f, "the frame end byte ({:#02x}) was found inside the data", START_STOP),
+            Self::NotEnoughData(expected, found) => write!(f, "was epxected at least {} bytes, found {} bytes", expected, found),
             Self::MissingEscapedData(b) => write!(f, "the escape byte ({:#02x}) was placed before an invalid escaped byte: ({:#02x})", ESCAPE, b),
         }
     }
