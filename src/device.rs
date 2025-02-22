@@ -25,9 +25,7 @@ impl<T: SerialPort> Device<T> {
 
     pub fn get_setpoint(&mut self) -> Result<f32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01]);
-        let raw = frame.into_raw();
-        println!("{:?}", raw);
-        let _ = self.port.write(&raw)?;
+        let _ = self.port.write(&frame.into_raw())?;
         let res = self.read_response()?;
         let data = res.into_data();
         if data.len() < 4 {
@@ -41,10 +39,8 @@ impl<T: SerialPort> Device<T> {
         let setpoint_bytes = setpoint.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]]);
 
-        let raw = frame.into_raw();
-        println!("{:?}", raw);
-        let _ = self.port.write(&raw)?;
-        let res = self.read_response()?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
         Ok(())
     }
 
@@ -63,7 +59,6 @@ impl<T: SerialPort> Device<T> {
     pub fn read_average_measured_value(&mut self, measurment_count: u8) -> Result<f32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x08, &[0x11, measurment_count]);
         let raw = frame.into_raw();
-        println!("{:?}", raw);
 
         let _ = self.port.write(&raw)?;
         let res = self.read_response()?;
@@ -97,6 +92,15 @@ impl<T: SerialPort> Device<T> {
         self.port.set_baud_rate(baudrate)?;
 
         Ok(())
+    }
+
+    pub fn get_current_full_scale(&mut self) -> Result<f32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x14]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let res = self.read_response()?;
+        let data = res.into_data();
+
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
     pub fn get_product_type(&mut self) -> Result<String, DeviceError> {
@@ -174,9 +178,7 @@ impl<T: SerialPort> Device<T> {
         let mut out = ArrayVec::<u8, 518>::new();
         loop {
             let s = self.port.read(&mut buff)?;
-            println!("{:?}", &buff[..s]);
             out.try_extend_from_slice(&buff[..s]).unwrap();
-            println!("{}, {}", buff[s-1], out.len());
             if buff[s-1] == 0x7E && (s > 1 || out.len() > 1) {
                 break;
             }
@@ -409,5 +411,24 @@ mod tests {
         let r1 = device.read_measured_value().unwrap();
         let r2 = device.read_average_measured_value(50).unwrap();
         println!("{}, {}", r1, r2);
+    }
+
+    #[test]
+    #[serial]
+    fn read_wrong_measured_value() {
+        let mut device = create_device();
+        let r1 = device.read_average_measured_value(192);
+        match r1 {
+            Err(DeviceError::StateResponse(StateResponseError::ParameterError)) => {},
+            _ => panic!("expected, StateReesponseError::ParameterError"),
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn get_current_full_scale() {
+        let mut device = create_device();
+        let r1 = device.get_current_full_scale().unwrap();
+        println!("{}", r1);
     }
 }
