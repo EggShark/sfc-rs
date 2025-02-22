@@ -21,8 +21,14 @@ pub struct MOSIFrame {
 
 impl MOSIFrame {
     pub fn new(address: u8, command: u8, data: &[u8]) -> Self {
+        let mut pre_procressed: ArrayVec<u8, 258> = ArrayVec::new();
+        pre_procressed.push(address);
+        pre_procressed.push(command);
+        pre_procressed.push(data.len() as u8);
+        pre_procressed.try_extend_from_slice(data).unwrap();
+
         let data_length = data.len() as u8;
-        let raw = to_shdlc(address, command, data_length, data).unwrap();
+        let raw = to_shdlc(&pre_procressed).unwrap();
         Self {
             address,
             command,
@@ -30,6 +36,10 @@ impl MOSIFrame {
             raw,
             checksum: 0,
         }
+    }
+
+    pub fn check_sum(&self) -> u8 {
+        self.checksum
     }
 
     pub fn into_raw(self) -> ArrayVec<u8, 518> {
@@ -101,37 +111,19 @@ impl MISOFrame {
     }
 }
 
-pub fn calculate_check_sum(frame: &[u8]) -> u8 {
-    frame[1..].iter().fold(0_u8, |acc, x| acc.wrapping_add(*x)) ^ 0xFF_u8
+pub fn calculate_check_sum(data: &[u8]) -> u8 {
+    data.iter().fold(0, |acc: u8, x| acc.wrapping_add(*x)) ^ 0xFF_u8
 }
 
-pub fn to_shdlc(address: u8, command: u8, data_len: u8, data: &[u8]) -> Result<ArrayVec<u8, 518>, TranslationError> {
-    let mut out = ArrayVec::new();
-    out.push(START_STOP);
-    out.push(address);
-    out.push(command);
-    
-    match data_len {
-        START_STOP => {
-            out.push(ESCAPE);
-            out.push(START_SWAP);
-        }
-        ESCAPE => {
-            out.push(ESCAPE);
-            out.push(ESCAPE_SWAP);
-        }
-        XON => {
-            out.push(ESCAPE);
-            out.push(XON_SWAP);
-        }
-        XOFF => {
-            out.push(ESCAPE);
-            out.push(XOFF_SWAP);
-        }
-        _ => out.push(data_len),
-    }
 
-    if data.len() > 255 {
+pub fn to_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 518>, TranslationError> {
+    let mut out = ArrayVec::new();
+
+    out.push(START_STOP);
+    let ck = calculate_check_sum(data);
+    
+
+    if data.len() > 258 {
         Err(TranslationError::DataTooLarge)?;
     }
 
@@ -156,8 +148,7 @@ pub fn to_shdlc(address: u8, command: u8, data_len: u8, data: &[u8]) -> Result<A
             _ => out.push(b)
         }
     }
-    let checksum = calculate_check_sum(&out);
-    out.push(checksum);
+    out.push(ck);
 
     out.push(START_STOP);
 

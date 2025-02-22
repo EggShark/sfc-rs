@@ -14,7 +14,7 @@ pub struct Device<T: SerialPort> {
 
 impl<T: SerialPort> Device<T> {
     pub fn new(mut serial_port: T, slave_adress: u8) -> Self {
-        let _ = serial_port.set_timeout(std::time::Duration::from_millis(400));
+        serial_port.set_timeout(std::time::Duration::from_millis(400)).unwrap();
 
         Self {
             port: serial_port,
@@ -25,7 +25,9 @@ impl<T: SerialPort> Device<T> {
 
     pub fn get_setpoint(&mut self) -> Result<f32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01]);
-        let _ = self.port.write(&frame.into_raw())?;
+        let raw = frame.into_raw();
+        println!("{:?}", raw);
+        let _ = self.port.write(&raw)?;
         let res = self.read_response()?;
         let data = res.into_data();
         if data.len() < 4 {
@@ -38,8 +40,11 @@ impl<T: SerialPort> Device<T> {
     pub fn set_setpoint(&mut self, setpoint: f32) -> Result<(), DeviceError> {
         let setpoint_bytes = setpoint.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]]);
-        let _ = self.port.write(&frame.into_raw())?;
-        let _ = self.read_response()?;
+
+        let raw = frame.into_raw();
+        println!("{:?}", raw);
+        let _ = self.port.write(&raw)?;
+        let res = self.read_response()?;
         Ok(())
     }
 
@@ -56,8 +61,11 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn read_average_measured_value(&mut self, measurment_count: u8) -> Result<f32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x08, &[measurment_count]);
-        let _ = self.port.write(&frame.into_raw())?;
+        let frame = MOSIFrame::new(self.slave_adress, 0x08, &[0x11, measurment_count]);
+        let raw = frame.into_raw();
+        println!("{:?}", raw);
+
+        let _ = self.port.write(&raw)?;
         let res = self.read_response()?;
         let data = res.into_data();
         if data.len() < 4 {
@@ -166,7 +174,9 @@ impl<T: SerialPort> Device<T> {
         let mut out = ArrayVec::<u8, 518>::new();
         loop {
             let s = self.port.read(&mut buff)?;
+            println!("{:?}", &buff[..s]);
             out.try_extend_from_slice(&buff[..s]).unwrap();
+            println!("{}, {}", buff[s-1], out.len());
             if buff[s-1] == 0x7E && (s > 1 || out.len() > 1) {
                 break;
             }
@@ -380,5 +390,24 @@ mod tests {
             Err(DeviceError::StateResponse(StateResponseError::ParameterError)) => {},
             _ => panic!("expected, StateResponseError::ParameterError"),
         }
+    }
+
+    #[test]
+    #[serial]
+    fn set_get_set_setpoint() {
+        let mut device = create_device();
+        device.set_setpoint(2.0).unwrap();
+        let res = device.get_setpoint().unwrap();
+        device.set_setpoint(0.0).unwrap();
+        assert_eq!(res, 2.0);
+    }
+
+    #[test]
+    #[serial]
+    fn reading_measured_values() {
+        let mut device = create_device();
+        let r1 = device.read_measured_value().unwrap();
+        let r2 = device.read_average_measured_value(50).unwrap();
+        println!("{}, {}", r1, r2);
     }
 }
