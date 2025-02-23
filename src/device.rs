@@ -161,6 +161,55 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    pub fn get_number_of_calibrations(&mut self) -> Result<u32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x00]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+        Ok(u32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn get_calibration_validity(&mut self, calibration_index: u32) -> Result<bool, DeviceError> {
+        let index_bytes = calibration_index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x10, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.is_empty() {
+            Err(TranslationError::NotEnoughData(1, data.len() as u8))?;
+        }
+
+        Ok(data[0] > 0)
+    }
+
+    pub fn get_calibration_id(&mut self, calibration_index: u32) -> Result<u32, DeviceError> { 
+        let index_bytes = calibration_index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x10, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(1, data.len() as u8))?;
+        }
+
+        Ok(u32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn get_calibration_gas_unit(&mut self, calibration_index: u32) -> Result<(), DeviceError> { 
+        let index_bytes = calibration_index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x10, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(1, data.len() as u8))?;
+        }
+        todo!()
+    }
+
     pub fn get_baudrate(&mut self) -> Result<u32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x91, &[]);
         let _ = self.port.write(&frame.into_raw())?;
