@@ -4,7 +4,7 @@ use std::fmt::Display;
 use arrayvec::ArrayVec;
 use serialport::SerialPort;
 
-use crate::shdlc::{MISOFrame, MOSIFrame, TranslationError};
+use crate::{gasunit::{GasUnit, Prefixes, TimeBases, Units}, shdlc::{MISOFrame, MOSIFrame, TranslationError}};
 
 pub struct Device<T: SerialPort> {
     port: T,
@@ -187,7 +187,7 @@ impl<T: SerialPort> Device<T> {
 
     pub fn get_calibration_id(&mut self, calibration_index: u32) -> Result<u32, DeviceError> { 
         let index_bytes = calibration_index.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x10, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x12, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
@@ -198,16 +198,37 @@ impl<T: SerialPort> Device<T> {
         Ok(u32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
-    pub fn get_calibration_gas_unit(&mut self, calibration_index: u32) -> Result<(), DeviceError> { 
+    pub fn get_calibration_gas_unit(&mut self, calibration_index: u32) -> Result<GasUnit, DeviceError> { 
         let index_bytes = calibration_index.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x10, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x13, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 3 {
+            Err(TranslationError::NotEnoughData(3, data.len() as u8))?;
+        }
+
+        let prefix = Prefixes::from(i8::from_be_bytes([data[0]]));
+        let unit = Units::from(data[1]);
+        let time_base = TimeBases::from(data[2]);
+        Ok(GasUnit {
+            unit_prefex: prefix,
+            medium_unit: unit,
+            timebase: time_base,
+        })
+    }
+
+    pub fn get_calibration_full_scale(&mut self, calibration_index: u32) -> Result<f32, DeviceError>{
+        let index_bytes = calibration_index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x14, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
         if data.len() < 4 {
-            Err(TranslationError::NotEnoughData(1, data.len() as u8))?;
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
         }
-        todo!()
+
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
     pub fn get_baudrate(&mut self) -> Result<u32, DeviceError> {
