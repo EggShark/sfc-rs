@@ -231,15 +231,61 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    pub fn get_current_gas_id(&mut self) -> Result<u32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x12]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+        
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+
+        Ok(u32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn get_current_gas_unit(&mut self) -> Result<GasUnit, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x13]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 3 {
+            Err(TranslationError::NotEnoughData(3, data.len() as u8))?;
+        }
+
+        let prefix = Prefixes::from(i8::from_be_bytes([data[0]]));
+        let unit = Units::from(data[1]);
+        let time_base = TimeBases::from(data[2]);
+        Ok(GasUnit {
+            unit_prefex: prefix,
+            medium_unit: unit,
+            timebase: time_base,
+        })
+    }
+
+    pub fn get_current_full_scale(&mut self) -> Result<f32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x14]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let res = self.read_response()?;
+        let data = res.into_data();
+
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
     pub fn get_baudrate(&mut self) -> Result<u32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x91, &[]);
         let _ = self.port.write(&frame.into_raw())?;
 
         let response = self.read_response()?;
         let data = response.into_data();
+        
         if data.len() < 4 {
-            panic!("WOOOW not enough bytes");
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
         }
+
         let res = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
 
         Ok(res)
@@ -253,15 +299,6 @@ impl<T: SerialPort> Device<T> {
         self.port.set_baud_rate(baudrate)?;
 
         Ok(())
-    }
-
-    pub fn get_current_full_scale(&mut self) -> Result<f32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x14]);
-        let _ = self.port.write(&frame.into_raw())?;
-        let res = self.read_response()?;
-        let data = res.into_data();
-
-        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
     pub fn get_product_type(&mut self) -> Result<String, DeviceError> {
