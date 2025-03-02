@@ -275,6 +275,28 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    pub fn get_calliration_id(&mut self) -> Result<u32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x45, &[]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let res = self.read_response()?;
+        let data = res.into_data();
+        
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+
+        Ok(u32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn set_callibration(&mut self, calibration_index: u32) -> Result<(), DeviceError> {
+        let cal_bytes = calibration_index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_adress, 0x45, &cal_bytes);
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+
+        Ok(())
+    }
+
     pub fn get_baudrate(&mut self) -> Result<u32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x91, &[]);
         let _ = self.port.write(&frame.into_raw())?;
