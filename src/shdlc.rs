@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use arrayvec::ArrayVec;
+use arrayvec::{ArrayVec, CapacityError};
 
 pub const START_STOP: u8 = 0x7E;
 pub const START_SWAP: u8 = 0x5E;
@@ -163,15 +163,15 @@ pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 262>, TranslationError> {
     while let Some(&byte) = iter.next() {
         match byte {
             ESCAPE => match iter.next() {
-                Some(0x5E) => out.push(START_STOP),
-                Some(0x5D) => out.push(ESCAPE),
-                Some(0x31) => out.push(XON),
-                Some(0x33) => out.push(XOFF),
+                Some(0x5E) => out.try_push(START_STOP)?,
+                Some(0x5D) => out.try_push(ESCAPE)?,
+                Some(0x31) => out.try_push(XON)?,
+                Some(0x33) => out.try_push(XOFF)?,
                 Some(b) => Err(TranslationError::MissingEscapedData(*b))?,
                 None => Err(TranslationError::MissingEscapedData(0))?,
             }
             START_STOP => Err(TranslationError::FrameEndInData)?,
-            _ => out.push(byte),
+            _ => out.try_push(byte)?,
         }
     }
 
@@ -197,11 +197,15 @@ impl Display for TranslationError {
     }
 }
 
+impl From<CapacityError<u8>> for TranslationError {
+    fn from(_: CapacityError<u8>) -> Self {
+        Self::DataTooLarge
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::calculate_check_sum;
-    use approx::relative_eq;
 
     #[test]
     fn from_guide() {

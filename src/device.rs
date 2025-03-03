@@ -1,7 +1,7 @@
 use std::ffi::CString;
 use std::fmt::Display;
 
-use arrayvec::ArrayVec;
+use arrayvec::{ArrayVec, CapacityError};
 use serialport::SerialPort;
 
 use crate::{gasunit::{GasUnit, Prefixes, TimeBases, Units}, shdlc::{MISOFrame, MOSIFrame, TranslationError}};
@@ -390,15 +390,12 @@ impl<T: SerialPort> Device<T> {
         Ok(string)
     }
 
-    
-
-    // for now test command to read device information
     pub fn read_response(&mut self) -> Result<MISOFrame, DeviceError> {
         let mut buff = [0_u8; 20];
         let mut out = ArrayVec::<u8, 518>::new();
         loop {
             let s = self.port.read(&mut buff)?;
-            out.try_extend_from_slice(&buff[..s]).unwrap();
+            out.try_extend_from_slice(&buff[..s])?;
             if buff[s-1] == 0x7E && (s > 1 || out.len() > 1) {
                 break;
             }
@@ -462,6 +459,12 @@ impl From<StateResponseError> for DeviceError {
 impl From<serialport::Error> for DeviceError {
     fn from(value: serialport::Error) -> Self {
         Self::PortError(value)
+    }
+}
+
+impl From<CapacityError> for DeviceError {
+    fn from(_: CapacityError) -> Self {
+        Self::ShdlcError(TranslationError::DataTooLarge)
     }
 }
 
