@@ -713,4 +713,55 @@ mod tests {
         let temp = device.measure_temperature().unwrap();
         println!("Temperature in C: {}", temp);
     }
+
+    #[test]
+    #[serial]
+    fn number_of_calibrations() {
+        let mut device = create_device();
+        let res = device.get_number_of_calibrations().unwrap();
+        assert_eq!(res, 6);
+    }
+ 
+    #[test]
+    #[serial]
+    fn calibration_is_valid() {
+        let mut device = create_device();
+        let res = device.get_calibration_validity(0).unwrap();
+        assert!(res);
+    }
+
+    #[test]
+    #[serial]
+    fn defualt_calibration() {
+        let mut device = create_device();
+        let unit = device.get_calibration_gas_unit(0).unwrap();
+        let assert_unit = GasUnit {
+           unit_prefex: Prefixes::Base,
+           timebase: TimeBases::Minute,
+           medium_unit: Units::StandardLiter,
+        };
+        assert_eq!(unit, assert_unit);
+    }
+
+    #[test]
+    #[serial]
+    fn gas_calibration_functions() {
+        let mut device = create_device();
+        let unit = device.get_calibration_gas_unit(0).unwrap();
+        let fs = device.get_calibration_full_scale(0).unwrap();
+        let id = device.get_current_gas_id().unwrap();
+        println!("fs: {}", fs);
+        println!("unit: {:?}", unit);
+        println!("id: {}", id);
+    }
+    
+    #[test]
+    #[serial]
+    fn set_and_reset_calibration() {
+        let mut device = create_device();
+        let original = device.get_calliration_id().unwrap();
+        device.set_callibration(1).unwrap();
+        assert_eq!(1, device.get_calliration_id().unwrap());
+        device.set_callibration(original).unwrap();
+    }
 }

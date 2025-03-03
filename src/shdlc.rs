@@ -205,7 +205,7 @@ impl From<CapacityError<u8>> for TranslationError {
 
 #[cfg(test)]
 mod tests {
-    use super::calculate_check_sum;
+    use super::*;
 
     #[test]
     fn from_guide() {
@@ -226,5 +226,19 @@ mod tests {
         let data = [0, 200, 201, 202];
         let ck = calculate_check_sum(&data);
         assert_eq!(ck, 164);
+    }
+
+    #[test]
+    fn too_much_data_in() {
+        let vec = vec![0_u8; 1000];
+        let attempt = to_shdlc(&vec);
+        assert_eq!(attempt, Err(TranslationError::DataTooLarge));
+    }
+
+    #[test]
+    fn too_much_data_out() {
+        let vec = vec![0_u8; 1000];
+        let attempt = from_shdlc(&vec);
+        assert_eq!(attempt, Err(TranslationError::DataTooLarge));
     }
 }

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GasUnit {
     pub unit_prefex: Prefixes,
     pub medium_unit: Units,
