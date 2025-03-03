@@ -297,6 +297,14 @@ impl<T: SerialPort> Device<T> {
         Ok(())
     }
 
+    pub fn set_callibration_volitile(&mut self, calibration_index: u32) -> Result<(), DeviceError> {
+        let cal_bytes = calibration_index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_adress, 0x46, &cal_bytes);
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+        Ok(())
+    }
+
     pub fn get_baudrate(&mut self) -> Result<u32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x91, &[]);
         let _ = self.port.write(&frame.into_raw())?;
@@ -388,6 +396,14 @@ impl<T: SerialPort> Device<T> {
         };
 
         Ok(string)
+    }
+
+    pub fn reset_device(&mut self) -> Result<(), DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0xD3, &[]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+
+        Ok(())
     }
 
     pub fn read_response(&mut self) -> Result<MISOFrame, DeviceError> {
@@ -755,13 +771,25 @@ mod tests {
         println!("id: {}", id);
     }
     
+    // ignored due to the limited write cycles of the flash memory
     #[test]
     #[serial]
+    #[ignore]
     fn set_and_reset_calibration() {
         let mut device = create_device();
         let original = device.get_calliration_id().unwrap();
         device.set_callibration(1).unwrap();
         assert_eq!(1, device.get_calliration_id().unwrap());
         device.set_callibration(original).unwrap();
+    }
+    
+    #[test]
+    #[serial]
+    fn set_callibration_volitile() {
+        let mut device = create_device();
+        device.set_callibration_volitile(2).unwrap();
+        device.reset_device().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        assert_eq!(1, device.get_calliration_id().unwrap());
     }
 }
