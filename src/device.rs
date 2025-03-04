@@ -4,7 +4,7 @@ use std::fmt::Display;
 use arrayvec::{ArrayVec, CapacityError};
 use serialport::SerialPort;
 
-use crate::{gasunit::{GasUnit, Prefixes, TimeBases, Units}, shdlc::{MISOFrame, MOSIFrame, TranslationError}};
+use crate::{gasunit::{GasUnit, Prefixes, TimeBases, Units}, shdlc::{MISOFrame, MOSIFrame, TranslationError}, version::Version};
 
 pub struct Device<T: SerialPort> {
     port: T,
@@ -398,6 +398,26 @@ impl<T: SerialPort> Device<T> {
         Ok(string)
     }
 
+    pub fn get_version(&mut self) -> Result<Version, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0xD1, &[]);
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 7 {
+            Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(7, data.len() as u8)))?;
+        }
+
+        Ok(Version {
+            firmware_major: data[0],
+            firmware_minor: data[1],
+            debug: data[2] > 0,
+            hardware_major: data[3],
+            hardware_minor: data[4],
+            protocol_major: data[5],
+            protocol_minor: data[6],
+        })
+    }
+
     pub fn reset_device(&mut self) -> Result<(), DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0xD3, &[]);
         let _ = self.port.write(&frame.into_raw())?;
@@ -785,11 +805,19 @@ mod tests {
     
     #[test]
     #[serial]
-    fn set_callibration_volitile() {
+    fn set_callibration_volitile_and_reset() {
         let mut device = create_device();
         device.set_callibration_volitile(2).unwrap();
         device.reset_device().unwrap();
         std::thread::sleep(std::time::Duration::from_millis(400));
         assert_eq!(1, device.get_calliration_id().unwrap());
+    }
+
+    #[test]
+    #[serial]
+    fn get_firmware_version() {
+        let mut device = create_device();
+        let v = device.get_version().unwrap();
+        println!("{:?}", v);
     }
 }
