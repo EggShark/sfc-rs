@@ -38,6 +38,18 @@ impl MOSIFrame {
         }
     }
 
+    pub fn get_address(&self) -> u8 {
+        self.address
+    }
+
+    pub fn get_command_number(&self) -> u8 {
+        self.command
+    }
+
+    pub fn get_data_length(&self) -> u8 {
+        self.data_length
+    }
+
     pub fn check_sum(&self) -> u8 {
         self.checksum
     }
