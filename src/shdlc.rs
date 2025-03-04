@@ -57,6 +57,12 @@ impl MOSIFrame {
     pub fn into_raw(self) -> ArrayVec<u8, 518> {
         self.raw
     }
+
+    pub fn validate_checksum(&self) -> bool {
+        let raw = from_shdlc(&self.raw).unwrap();
+        let ck = calculate_check_sum(&raw[1..raw.len()-2]);
+        ck == self.checksum
+    }
 }
 
 #[derive(Debug)]
