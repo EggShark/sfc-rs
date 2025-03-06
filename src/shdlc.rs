@@ -1,3 +1,5 @@
+//! Functions and structs relating to the underlying SHDLC protocol
+
 use std::fmt::Display;
 
 use arrayvec::{ArrayVec, CapacityError};
@@ -11,6 +13,10 @@ pub const XON_SWAP: u8 = 0x31;
 pub const XOFF: u8 = 0x13;
 pub const XOFF_SWAP: u8 = 0x33;
 
+/// A representation of a SHDLC Master Out Slave In frame.
+/// Each frame contains a 1 byte Frame start/end symbol. The slave adress of the device.
+/// The command byte. The length of the data being 0-255. The actuall data a checksum followed 
+/// by the Frame end byte.
 pub struct MOSIFrame {
     address: u8,
     command: u8,
@@ -20,22 +26,24 @@ pub struct MOSIFrame {
 }
 
 impl MOSIFrame {
-    pub fn new(address: u8, command: u8, data: &[u8]) -> Self {
+    /// Constructs a MOSI frame from the adress, command, and data. This will automatically
+    /// translate the data using SHDLC byte stuffing.
+    pub fn new(address: u8, command: u8, data: &[u8]) -> Result<Self, TranslationError> {
         let mut pre_procressed: ArrayVec<u8, 258> = ArrayVec::new();
         pre_procressed.push(address);
         pre_procressed.push(command);
         pre_procressed.push(data.len() as u8);
-        pre_procressed.try_extend_from_slice(data).unwrap();
+        pre_procressed.try_extend_from_slice(data)?;
 
         let data_length = data.len() as u8;
-        let raw = to_shdlc(&pre_procressed).unwrap();
-        Self {
+        let raw = to_shdlc(&pre_procressed)?;
+        Ok(Self {
             address,
             command,
             data_length,
             raw,
             checksum: 0,
-        }
+        })
     }
 
     pub fn get_address(&self) -> u8 {
@@ -215,8 +223,8 @@ impl Display for TranslationError {
     }
 }
 
-impl From<CapacityError<u8>> for TranslationError {
-    fn from(_: CapacityError<u8>) -> Self {
+impl<T> From<CapacityError<T>> for TranslationError {
+    fn from(_: CapacityError<T>) -> Self {
         Self::DataTooLarge
     }
 }

@@ -24,7 +24,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_setpoint(&mut self) -> Result<f32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01])?;
         let _ = self.port.write(&frame.into_raw())?;
         let res = self.read_response()?;
         let data = res.into_data();
@@ -37,7 +37,7 @@ impl<T: SerialPort> Device<T> {
 
     pub fn set_setpoint(&mut self, setpoint: f32) -> Result<(), DeviceError> {
         let setpoint_bytes = setpoint.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]])?;
 
         let _ = self.port.write(&frame.into_raw())?;
         let _ = self.read_response()?;
@@ -45,7 +45,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn read_measured_value(&mut self) -> Result<f32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x08, &[0x01]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x08, &[0x01])?;
         let _ = self.port.write(&frame.into_raw())?;
         let res = self.read_response()?;
         let data = res.into_data();
@@ -57,7 +57,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn read_average_measured_value(&mut self, measurment_count: u8) -> Result<f32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x08, &[0x11, measurment_count]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x08, &[0x11, measurment_count])?;
         let raw = frame.into_raw();
 
         let _ = self.port.write(&raw)?;
@@ -72,7 +72,7 @@ impl<T: SerialPort> Device<T> {
 
     pub fn set_setpoint_and_read_measured_value(&mut self, setpoint: f32) -> Result<f32, DeviceError> {
         let setpoint_bytes = setpoint.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x03, &[0x01, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x03, &[0x01, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]])?;
         let _ = self.port.write(&frame.into_raw())?;
         let res = self.read_response()?;
         let data = res.into_data();
@@ -85,7 +85,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_controller_gain(&mut self) -> Result<f32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x00]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x00])?;
         let _ = self.port.write(&frame.into_raw())?;
         let res = self.read_response()?;
         let data = res.into_data();
@@ -99,14 +99,14 @@ impl<T: SerialPort> Device<T> {
 
     pub fn set_controller_gain(&mut self, gain: f32) -> Result<(), DeviceError> {
         let gain_bytes = gain.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x00, gain_bytes[0], gain_bytes[1], gain_bytes[2], gain_bytes[3]]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x00, gain_bytes[0], gain_bytes[1], gain_bytes[2], gain_bytes[3]])?;
         let _ = self.port.write(&frame.into_raw())?;
         let _ = self.read_response()?;
         Ok(())
     }
 
     pub fn get_initial_step(&mut self) -> Result<f32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x03]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x03])?;
         let _ = self.port.write(&frame.into_raw())?;
         let res = self.read_response()?;
         let data = res.into_data();
@@ -119,14 +119,14 @@ impl<T: SerialPort> Device<T> {
 
     pub fn set_initial_step(&mut self, step: f32) -> Result<(), DeviceError> {
         let step_bytes = step.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x03, step_bytes[0], step_bytes[1], step_bytes[2], step_bytes[3]]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x03, step_bytes[0], step_bytes[1], step_bytes[2], step_bytes[3]])?;
         let _ = self.port.write(&frame.into_raw())?;
         let _ = self.read_response()?;
         Ok(())
     }
 
     pub fn measure_raw_flow(&mut self) -> Result<u16, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x00]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x00])?;
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
@@ -138,7 +138,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn measure_raw_thermal_conductivity(&mut self) -> Result<u16, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x02]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x02])?;
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
@@ -150,7 +150,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn measure_temperature(&mut self) -> Result<f32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x10]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x10])?;
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
@@ -162,7 +162,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_number_of_calibrations(&mut self) -> Result<u32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x00]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x00])?;
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
@@ -174,7 +174,7 @@ impl<T: SerialPort> Device<T> {
 
     pub fn get_calibration_validity(&mut self, calibration_index: u32) -> Result<bool, DeviceError> {
         let index_bytes = calibration_index.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x10, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x10, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]])?;
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
@@ -187,7 +187,7 @@ impl<T: SerialPort> Device<T> {
 
     pub fn get_calibration_id(&mut self, calibration_index: u32) -> Result<u32, DeviceError> { 
         let index_bytes = calibration_index.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x12, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x12, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]])?;
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
@@ -200,7 +200,7 @@ impl<T: SerialPort> Device<T> {
 
     pub fn get_calibration_gas_unit(&mut self, calibration_index: u32) -> Result<GasUnit, DeviceError> { 
         let index_bytes = calibration_index.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x13, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x13, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]])?;
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
@@ -220,7 +220,7 @@ impl<T: SerialPort> Device<T> {
 
     pub fn get_calibration_full_scale(&mut self, calibration_index: u32) -> Result<f32, DeviceError>{
         let index_bytes = calibration_index.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x14, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x14, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]])?;
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
@@ -232,7 +232,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_current_gas_id(&mut self) -> Result<u32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x12]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x12])?;
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
         
@@ -244,7 +244,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_current_gas_unit(&mut self) -> Result<GasUnit, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x13]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x13])?;
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
@@ -263,7 +263,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_current_full_scale(&mut self) -> Result<f32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x14]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x14])?;
         let _ = self.port.write(&frame.into_raw())?;
         let res = self.read_response()?;
         let data = res.into_data();
@@ -276,7 +276,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_calliration_id(&mut self) -> Result<u32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x45, &[]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x45, &[])?;
         let _ = self.port.write(&frame.into_raw())?;
         let res = self.read_response()?;
         let data = res.into_data();
@@ -290,7 +290,7 @@ impl<T: SerialPort> Device<T> {
 
     pub fn set_callibration(&mut self, calibration_index: u32) -> Result<(), DeviceError> {
         let cal_bytes = calibration_index.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x45, &cal_bytes);
+        let frame = MOSIFrame::new(self.slave_adress, 0x45, &cal_bytes)?;
         let _ = self.port.write(&frame.into_raw())?;
         let _ = self.read_response()?;
 
@@ -299,14 +299,14 @@ impl<T: SerialPort> Device<T> {
 
     pub fn set_callibration_volitile(&mut self, calibration_index: u32) -> Result<(), DeviceError> {
         let cal_bytes = calibration_index.to_be_bytes();
-        let frame = MOSIFrame::new(self.slave_adress, 0x46, &cal_bytes);
+        let frame = MOSIFrame::new(self.slave_adress, 0x46, &cal_bytes)?;
         let _ = self.port.write(&frame.into_raw())?;
         let _ = self.read_response()?;
         Ok(())
     }
 
     pub fn get_baudrate(&mut self) -> Result<u32, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x91, &[]);
+        let frame = MOSIFrame::new(self.slave_adress, 0x91, &[])?;
         let _ = self.port.write(&frame.into_raw())?;
 
         let response = self.read_response()?;
@@ -322,7 +322,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn set_baudrate(&mut self, baudrate: u32) -> Result<(), DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0x91, &baudrate.to_be_bytes());
+        let frame = MOSIFrame::new(self.slave_adress, 0x91, &baudrate.to_be_bytes())?;
         let _ = self.port.write(&frame.into_raw())?;
         let _ = self.read_response()?;
 
@@ -332,7 +332,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_product_type(&mut self) -> Result<String, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x00]);
+        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x00])?;
         let _ = self.port.write(&frame.into_raw())?;
 
         let response = self.read_response()?;
@@ -348,7 +348,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_product_name(&mut self) -> Result<String, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x01]);
+        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x01])?;
         let _ = self.port.write(&frame.into_raw())?;
         let response = self.read_response()?;
         let string = match CString::from_vec_with_nul(response.into_data().to_vec()) {
@@ -364,7 +364,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_article_code(&mut self) -> Result<String, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x02]);
+        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x02])?;
         let _ = self.port.write(&frame.into_raw())?;
         let response = self.read_response()?;
         let string = match CString::from_vec_with_nul(response.into_data().to_vec()) {
@@ -380,7 +380,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_serial_number(&mut self) -> Result<String, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x03]);
+        let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x03])?;
         let data = frame.into_raw();
 
         let _ = self.port.write(&data)?;
@@ -399,7 +399,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn get_version(&mut self) -> Result<Version, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0xD1, &[]);
+        let frame = MOSIFrame::new(self.slave_adress, 0xD1, &[])?;
         let _ = self.port.write(&frame.into_raw())?;
         let data = self.read_response()?.into_data();
 
@@ -419,7 +419,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn reset_device(&mut self) -> Result<(), DeviceError> {
-        let frame = MOSIFrame::new(self.slave_adress, 0xD3, &[]);
+        let frame = MOSIFrame::new(self.slave_adress, 0xD3, &[])?;
         let _ = self.port.write(&frame.into_raw())?;
         let _ = self.read_response()?;
 
