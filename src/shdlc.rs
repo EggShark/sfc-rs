@@ -1,4 +1,5 @@
-//! Functions and structs relating to the underlying SHDLC protocol
+//! Functions and structs relating to the underlying SHDLC protocol deffintions of these types can
+//! be seen [here](https://sensirion.com/media/documents/88CA2961/65156AEC/GF_AN_SFX6000_SHDLCGuide1.1.pdf)
 
 use std::fmt::Display;
 
@@ -46,26 +47,32 @@ impl MOSIFrame {
         })
     }
 
+    /// Returns the slave adress of the command
     pub fn get_address(&self) -> u8 {
         self.address
     }
 
+    /// Returns the command number/byte of 
     pub fn get_command_number(&self) -> u8 {
         self.command
     }
 
+    /// Returns the length of the data pre byte stuffing
     pub fn get_data_length(&self) -> u8 {
         self.data_length
     }
 
+    /// Returns the checksum of the MOSIframe
     pub fn check_sum(&self) -> u8 {
         self.checksum
     }
 
+    /// returns the underlying ArrayVec ready to be written to the device
     pub fn into_raw(self) -> ArrayVec<u8, 518> {
         self.raw
     }
 
+    /// Validates the checksum and returns true if its valid
     pub fn validate_checksum(&self) -> bool {
         let raw = from_shdlc(&self.raw).unwrap();
         let ck = calculate_check_sum(&raw[1..raw.len()-2]);
@@ -73,6 +80,10 @@ impl MOSIFrame {
     }
 }
 
+/// The Master In Slave Out frame or the response from the device. Simillar
+/// to the MOSI frame it begins with a start byte. The slave adress of the 
+/// responding device. The command number byte. The State byte. The data length.
+/// Followed by the data, the checksum and a stop byte.
 #[derive(Debug)]
 pub struct MISOFrame {
     address: u8,
@@ -85,6 +96,7 @@ pub struct MISOFrame {
 
 
 impl MISOFrame {
+    /// parses the data from raw bytes should come from a bytestream of the device
     pub fn from_bytes(data: &[u8]) -> Self {
         let decoded = from_shdlc(data).unwrap();
         let address = decoded[0];
@@ -105,18 +117,22 @@ impl MISOFrame {
         }
     }
 
+    /// Reads the state byte and returns true if its 0
     pub fn is_ok(&self) -> bool {
         self.state == 0
     }
 
+    /// Returns the state byte of the MOSI frame
     pub fn get_state(&self) -> u8 {
         self.state
     }
 
+    /// Returns the checksum
     pub fn get_checksum(&self) -> u8 {
         self.checksum
     }
 
+    /// Calculates the checksum of the MOSI frame
     pub fn calculate_check_sum(&self) -> u8 {
         let mut ck: u8 = 0;
         ck = ck.wrapping_add(self.address);
@@ -128,20 +144,23 @@ impl MISOFrame {
         ck
     }
 
+    /// validates the checksum from the device
     pub fn validate_checksum(&self) -> bool {
        self.calculate_check_sum() == self.checksum
     }
 
+    /// Turns the frame directly into the underyling data pre byte stuffing
     pub fn into_data(self) -> ArrayVec<u8, 255> {
         self.data
     }
 }
 
+/// Cacluates the SHDLC checksum from a byte array
 pub fn calculate_check_sum(data: &[u8]) -> u8 {
     data.iter().fold(0, |acc: u8, x| acc.wrapping_add(*x)) ^ 0xFF_u8
 }
 
-
+/// Does the byte stuffing operations in order to send data to the physical device
 pub fn to_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 518>, TranslationError> {
     let mut out = ArrayVec::new();
 
@@ -181,6 +200,7 @@ pub fn to_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 518>, TranslationError> {
     Ok(out)
 }
 
+/// Translates the byte data from the device into standard data without bytestuffing
 pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 262>, TranslationError> {
     let mut out = ArrayVec::new();
 
@@ -204,11 +224,16 @@ pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 262>, TranslationError> {
     Ok(out)
 }
 
+/// Each type of error that can occur from translating to and from SHDLC
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TranslationError {
+    /// Too much data was supplied. Data frame was larger than 255 bytes long
     DataTooLarge,
+    /// There was not enough data. First value is expected number second value is found number
     NotEnoughData(u8, u8),
+    /// The escape byte 0x7D was encountered but a valid swap character was not found 
     MissingEscapedData(u8),
+    /// The frame end byte was fround inside the data
     FrameEndInData,
 }
 
