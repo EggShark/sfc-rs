@@ -1,5 +1,11 @@
+//! Gas calbrtions come with units of measurments. The format is a (SI prefix * Flow unit)/Time
+//! Unit
+
 use std::fmt::Display;
 
+/// Returned from [get_calibration_gas_unit](crate::device::Device::get_calibration_gas_unit)
+/// and [get_current_gas_unit](crate::device::Device::get_current_gas_unit)
+/// representing the calibrations units per time. 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GasUnit {
     pub unit_prefex: Prefixes,
@@ -7,6 +13,7 @@ pub struct GasUnit {
     pub timebase: TimeBases,
 }
 
+/// SI prefixes that the device can transmit
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum Prefixes {
     Yocto,  // -24
@@ -91,6 +98,7 @@ impl Display for Prefixes {
     }
 }
 
+/// Diffrent units of flow the device can be calibrated to
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum Units {
     NormLiter,
@@ -134,6 +142,7 @@ impl Display for Units {
     }
 }
 
+/// Timescales for the calibrations
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum TimeBases {
     None,
