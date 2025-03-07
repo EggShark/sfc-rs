@@ -1,3 +1,5 @@
+//! The SFC6xxx device and associated functions
+
 use std::ffi::CString;
 use std::fmt::Display;
 
@@ -7,6 +9,11 @@ use serialport::SerialPort;
 use crate::gasunit::{GasUnit, Prefixes, TimeBases, Units};
 use crate::shdlc::{MISOFrame, MOSIFrame, TranslationError, Version};
 
+/// The device can be created by passing a serial port and slave adress like so:
+/// ```
+/// let test_port = serialport::new("ttyUSB0", 115200).open_native().unwrap();
+/// let device = Device::new(test_port, 0).unwrap();
+/// ```
 pub struct Device<T: SerialPort> {
     port: T,
     pub last_error_flag: u32,
@@ -14,14 +21,18 @@ pub struct Device<T: SerialPort> {
 }
 
 impl<T: SerialPort> Device<T> {
-    pub fn new(mut serial_port: T, slave_adress: u8) -> Self {
-        serial_port.set_timeout(std::time::Duration::from_millis(600)).unwrap();
+    pub fn new(mut serial_port: T, slave_adress: u8) -> Result<Self, DeviceError> {
+        serial_port.set_timeout(std::time::Duration::from_millis(600))?;
 
-        Self {
+        let mut device = Self {
             port: serial_port,
             last_error_flag: 0,
             slave_adress,
-        }
+        };
+
+        let _ = device.get_baudrate()?;
+
+        Ok(device)
     }
 
     pub fn get_setpoint(&mut self) -> Result<f32, DeviceError> {
@@ -306,6 +317,27 @@ impl<T: SerialPort> Device<T> {
         Ok(())
     }
 
+    pub fn get_slave_adress(&mut self) -> Result<u8, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x90, &[])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+        
+        if data.is_empty() {
+            Err(TranslationError::NotEnoughData(1, 0))?;
+        }
+
+        Ok(data[0])
+    }
+
+    pub fn set_slave_adress(&mut self, new_adress: u8) -> Result<(), DeviceError> {
+        let frame = MOSIFrame::new(self.slave_adress, 0x90, &[new_adress])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+
+        self.slave_adress = new_adress;
+        Ok(())
+    }
+
     pub fn get_baudrate(&mut self) -> Result<u32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x91, &[])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -584,7 +616,7 @@ mod tests {
 
     fn create_device() -> Device<SP> {
         let test_port = serialport::new(PORT, 115200).open_native().unwrap();
-        Device::new(test_port, 0)
+        Device::new(test_port, 0).unwrap()
     }
 
     #[test]

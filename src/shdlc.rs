@@ -263,6 +263,7 @@ impl<T> From<CapacityError<T>> for TranslationError {
 pub struct Version {
     pub firmware_major: u8,
     pub firmware_minor: u8,
+    /// True means the device is in debug mode
     pub debug: bool,
     pub hardware_major: u8,
     pub hardware_minor: u8,
