@@ -4,7 +4,8 @@ use std::fmt::Display;
 use arrayvec::{ArrayVec, CapacityError};
 use serialport::SerialPort;
 
-use crate::{gasunit::{GasUnit, Prefixes, TimeBases, Units}, shdlc::{MISOFrame, MOSIFrame, TranslationError}, version::Version};
+use crate::gasunit::{GasUnit, Prefixes, TimeBases, Units};
+use crate::shdlc::{MISOFrame, MOSIFrame, TranslationError, Version};
 
 pub struct Device<T: SerialPort> {
     port: T,
