@@ -848,6 +848,16 @@ mod tests {
 
     #[test]
     #[serial]
+    fn set_slave_adress_and_back() {
+        let mut device = create_device();
+        let original = device.get_slave_adress().unwrap();
+        device.set_slave_adress(2).unwrap();
+        assert_eq!(2, device.get_slave_adress().unwrap());
+        device.set_slave_adress(original).unwrap(); 
+    }
+
+    #[test]
+    #[serial]
     fn get_firmware_version() {
         let mut device = create_device();
         let v = device.get_version().unwrap();
