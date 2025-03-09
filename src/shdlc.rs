@@ -16,7 +16,7 @@ pub const XOFF_SWAP: u8 = 0x33;
 
 /// A representation of a SHDLC Master Out Slave In frame.
 /// Each frame contains a 1 byte Frame start/end symbol. The slave adress of the device.
-/// The command byte. The length of the data being 0-255. The actuall data a checksum followed 
+/// The command byte. The length of the data being 0-255. The actuall data a checksum followed
 /// by the Frame end byte.
 pub struct MOSIFrame {
     address: u8,
@@ -52,7 +52,7 @@ impl MOSIFrame {
         self.address
     }
 
-    /// Returns the command number/byte of 
+    /// Returns the command number/byte of
     pub fn get_command_number(&self) -> u8 {
         self.command
     }
@@ -75,13 +75,13 @@ impl MOSIFrame {
     /// Validates the checksum and returns true if its valid
     pub fn validate_checksum(&self) -> bool {
         let raw = from_shdlc(&self.raw).unwrap();
-        let ck = calculate_check_sum(&raw[1..raw.len()-2]);
+        let ck = calculate_check_sum(&raw[1..raw.len() - 2]);
         ck == self.checksum
     }
 }
 
 /// The Master In Slave Out frame or the response from the device. Simillar
-/// to the MOSI frame it begins with a start byte. The slave adress of the 
+/// to the MOSI frame it begins with a start byte. The slave adress of the
 /// responding device. The command number byte. The State byte. The data length.
 /// Followed by the data, the checksum and a stop byte.
 #[derive(Debug)]
@@ -94,7 +94,6 @@ pub struct MISOFrame {
     checksum: u8,
 }
 
-
 impl MISOFrame {
     /// parses the data from raw bytes should come from a bytestream of the device
     pub fn from_bytes(data: &[u8]) -> Self {
@@ -105,7 +104,7 @@ impl MISOFrame {
         let data_length = decoded[3];
         let checksum = decoded[decoded.len() - 1];
         let mut data = ArrayVec::new();
-        let _ = data.try_extend_from_slice(&decoded[4..4+data_length as usize]);
+        let _ = data.try_extend_from_slice(&decoded[4..4 + data_length as usize]);
 
         Self {
             address,
@@ -113,7 +112,7 @@ impl MISOFrame {
             data_length,
             state,
             data,
-            checksum
+            checksum,
         }
     }
 
@@ -146,7 +145,7 @@ impl MISOFrame {
 
     /// validates the checksum from the device
     pub fn validate_checksum(&self) -> bool {
-       self.calculate_check_sum() == self.checksum
+        self.calculate_check_sum() == self.checksum
     }
 
     /// Turns the frame directly into the underyling data pre byte stuffing
@@ -166,7 +165,6 @@ pub fn to_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 518>, TranslationError> {
 
     out.push(START_STOP);
     let ck = calculate_check_sum(data);
-    
 
     if data.len() > 258 {
         Err(TranslationError::DataTooLarge)?;
@@ -190,7 +188,7 @@ pub fn to_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 518>, TranslationError> {
                 out.push(ESCAPE);
                 out.push(XOFF_SWAP);
             }
-            _ => out.push(b)
+            _ => out.push(b),
         }
     }
     out.push(ck);
@@ -204,8 +202,8 @@ pub fn to_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 518>, TranslationError> {
 pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 262>, TranslationError> {
     let mut out = ArrayVec::new();
 
-    let mut iter = data[1..data.len()-1].iter();
-    
+    let mut iter = data[1..data.len() - 1].iter();
+
     while let Some(&byte) = iter.next() {
         match byte {
             ESCAPE => match iter.next() {
@@ -215,7 +213,7 @@ pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 262>, TranslationError> {
                 Some(0x33) => out.try_push(XOFF)?,
                 Some(b) => Err(TranslationError::MissingEscapedData(*b))?,
                 None => Err(TranslationError::MissingEscapedData(0))?,
-            }
+            },
             START_STOP => Err(TranslationError::FrameEndInData)?,
             _ => out.try_push(byte)?,
         }
@@ -231,7 +229,7 @@ pub enum TranslationError {
     DataTooLarge,
     /// There was not enough data. First value is expected number second value is found number
     NotEnoughData(u8, u8),
-    /// The escape byte 0x7D was encountered but a valid swap character was not found 
+    /// The escape byte 0x7D was encountered but a valid swap character was not found
     MissingEscapedData(u8),
     /// The frame end byte was fround inside the data
     FrameEndInData,
@@ -241,9 +239,21 @@ impl Display for TranslationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::DataTooLarge => write!(f, "data Exceeded maxium length of 256"),
-            Self::FrameEndInData => write!(f, "the frame end byte ({:#02x}) was found inside the data", START_STOP),
-            Self::NotEnoughData(expected, found) => write!(f, "was epxected at least {} bytes, found {} bytes", expected, found),
-            Self::MissingEscapedData(b) => write!(f, "the escape byte ({:#02x}) was placed before an invalid escaped byte: ({:#02x})", ESCAPE, b),
+            Self::FrameEndInData => write!(
+                f,
+                "the frame end byte ({:#02x}) was found inside the data",
+                START_STOP
+            ),
+            Self::NotEnoughData(expected, found) => write!(
+                f,
+                "was epxected at least {} bytes, found {} bytes",
+                expected, found
+            ),
+            Self::MissingEscapedData(b) => write!(
+                f,
+                "the escape byte ({:#02x}) was placed before an invalid escaped byte: ({:#02x})",
+                ESCAPE, b
+            ),
         }
     }
 }
@@ -255,9 +265,9 @@ impl<T> From<CapacityError<T>> for TranslationError {
 }
 
 /// Each device has version information that is returned from
-/// [get_version](crate::device::Device::get_version). There is a major 
+/// [get_version](crate::device::Device::get_version). There is a major
 /// and minor version for the firmware, hardware, and protocol. Additionly
-/// there is a flag that states wether or not the device's firmware is in 
+/// there is a flag that states wether or not the device's firmware is in
 /// debug mode
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Version {
