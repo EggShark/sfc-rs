@@ -19,7 +19,8 @@ pub struct Device<T: SerialPort> {
 
 impl<T: SerialPort> Device<T> {
     /// The device can be created by passing a serial port and slave adress like so:
-    /// ```
+    /// ```no_run
+    /// use sfc6xxx_rs::device::Device;
     /// let test_port = serialport::new("ttyUSB0", 115200).open_native().unwrap();
     /// let device = Device::new(test_port, 0).unwrap();
     /// ```
@@ -797,6 +798,8 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     type SP = TTYPort;
+    #[cfg(target_os = "windows")]
+    type SP = COMPort;
 
     fn create_device() -> Device<SP> {
         let test_port = serialport::new(PORT, 115200).open_native().unwrap();
