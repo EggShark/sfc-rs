@@ -9,32 +9,35 @@ use serialport::SerialPort;
 use crate::gasunit::{GasUnit, Prefixes, TimeBases, Units};
 use crate::shdlc::{MISOFrame, MOSIFrame, TranslationError, Version};
 
-/// The device can be created by passing a serial port and slave adress like so:
-/// ```
-/// let test_port = serialport::new("ttyUSB0", 115200).open_native().unwrap();
-/// let device = Device::new(test_port, 0).unwrap();
-/// ```
+/// A representation of a physical SFC6XXX. It must be given a valid serial port
+/// in order to operate.
 pub struct Device<T: SerialPort> {
     port: T,
-    pub last_error_flag: u32,
-    pub slave_adress: u8,
+    slave_adress: u8,
 }
 
 impl<T: SerialPort> Device<T> {
+
+    /// The device can be created by passing a serial port and slave adress like so:
+    /// ```
+    /// let test_port = serialport::new("ttyUSB0", 115200).open_native().unwrap();
+    /// let device = Device::new(test_port, 0).unwrap();
+    /// ```
     pub fn new(mut serial_port: T, slave_adress: u8) -> Result<Self, DeviceError> {
         serial_port.set_timeout(std::time::Duration::from_millis(600))?;
 
         let mut device = Self {
             port: serial_port,
-            last_error_flag: 0,
             slave_adress,
         };
-
+        
+        // simple command ot check if its a valid SHDLC device
         let _ = device.get_baudrate()?;
 
         Ok(device)
     }
 
+    /// Returns the current flow setpoint as a physical value in SLM
     pub fn get_setpoint(&mut self) -> Result<f32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -47,6 +50,9 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Sets the flow setpoint as a physical value. The range of valid set points is 0.0 to
+    /// [Self::get_current_full_scale]. The setpoint will be set to 0 if the calibration is ever
+    /// changed.
     pub fn set_setpoint(&mut self, setpoint: f32) -> Result<(), DeviceError> {
         let setpoint_bytes = setpoint.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x00, &[0x01, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]])?;
@@ -56,6 +62,7 @@ impl<T: SerialPort> Device<T> {
         Ok(())
     }
 
+    /// Returns the latest measured flow as physical value
     pub fn read_measured_value(&mut self) -> Result<f32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x08, &[0x01])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -68,6 +75,10 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0],data[1],data[2],data[3]]))
     }
 
+    /// Returns the average of given numbers of flow measurment as a physical value. Each
+    /// measurment takes 1ms so the command response time depends on the number of measurements.
+    /// Addtionaly the number of measurments must be between 0 and 100 other wise it will return a
+    /// [StateResponseError::ParameterError].
     pub fn read_average_measured_value(&mut self, measurment_count: u8) -> Result<f32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x08, &[0x11, measurment_count])?;
         let raw = frame.into_raw();
@@ -82,6 +93,7 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Sets the set point and reads the measured value in one SHDLC command
     pub fn set_setpoint_and_read_measured_value(&mut self, setpoint: f32) -> Result<f32, DeviceError> {
         let setpoint_bytes = setpoint.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x03, &[0x01, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]])?;
@@ -96,6 +108,7 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Returns the controller gain
     pub fn get_controller_gain(&mut self) -> Result<f32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x00])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -109,6 +122,7 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Sets the controller gain to the desired value
     pub fn set_controller_gain(&mut self, gain: f32) -> Result<(), DeviceError> {
         let gain_bytes = gain.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x00, gain_bytes[0], gain_bytes[1], gain_bytes[2], gain_bytes[3]])?;
@@ -117,6 +131,7 @@ impl<T: SerialPort> Device<T> {
         Ok(())
     }
 
+    /// Gets the device intital step
     pub fn get_initial_step(&mut self) -> Result<f32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x03])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -129,6 +144,8 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Sets the initial step. This is stored in non-volatile memory and will be cleared
+    /// after a device reset.
     pub fn set_initial_step(&mut self, step: f32) -> Result<(), DeviceError> {
         let step_bytes = step.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x22, &[0x03, step_bytes[0], step_bytes[1], step_bytes[2], step_bytes[3]])?;
@@ -137,6 +154,7 @@ impl<T: SerialPort> Device<T> {
         Ok(())
     }
 
+    /// Retunrs the measured flow in raw ticks
     pub fn measure_raw_flow(&mut self) -> Result<u16, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x00])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -149,6 +167,8 @@ impl<T: SerialPort> Device<T> {
         Ok(u16::from_be_bytes([data[0], data[1]]))
     }
 
+    /// Preforms a thermal conductivity measurement and returns the measure raw tick value.
+    /// The valve is automatically closed during the measurment
     pub fn measure_raw_thermal_conductivity(&mut self) -> Result<u16, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x02])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -161,6 +181,7 @@ impl<T: SerialPort> Device<T> {
         Ok(u16::from_be_bytes([data[0], data[1]]))
     }
 
+    /// Measures the temperature of the flow sensor in degrees celcius
     pub fn measure_temperature(&mut self) -> Result<f32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x10])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -173,6 +194,9 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Gets the number of calibrations that the device memory is able to hold.
+    /// Not all calibrations actually contain a valid calibration. Use [Device::get_calibration_validity]
+    /// to see which calibrations are valid and can be used
     pub fn get_number_of_calibrations(&mut self) -> Result<u32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x00])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -184,6 +208,7 @@ impl<T: SerialPort> Device<T> {
         Ok(u32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Checks if a calibration at the specific index is valid
     pub fn get_calibration_validity(&mut self, calibration_index: u32) -> Result<bool, DeviceError> {
         let index_bytes = calibration_index.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x10, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]])?;
@@ -197,7 +222,8 @@ impl<T: SerialPort> Device<T> {
         Ok(data[0] > 0)
     }
 
-    pub fn get_calibration_id(&mut self, calibration_index: u32) -> Result<u32, DeviceError> { 
+    /// Gets the gas ID of the specifc calibration index.
+    pub fn get_calibration_gas_id(&mut self, calibration_index: u32) -> Result<u32, DeviceError> { 
         let index_bytes = calibration_index.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x12, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -210,6 +236,7 @@ impl<T: SerialPort> Device<T> {
         Ok(u32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Gets the gas unit of a specifc calibration index see [GasUnit] for more information.
     pub fn get_calibration_gas_unit(&mut self, calibration_index: u32) -> Result<GasUnit, DeviceError> { 
         let index_bytes = calibration_index.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x13, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]])?;
@@ -230,6 +257,7 @@ impl<T: SerialPort> Device<T> {
         })
     }
 
+    /// Returns the full scale flow of a specifc calibration index.
     pub fn get_calibration_full_scale(&mut self, calibration_index: u32) -> Result<f32, DeviceError>{
         let index_bytes = calibration_index.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x40, &[0x14, index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3]])?;
@@ -243,6 +271,7 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Gets the gas ID of the currently active calibration
     pub fn get_current_gas_id(&mut self) -> Result<u32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x12])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -255,6 +284,8 @@ impl<T: SerialPort> Device<T> {
         Ok(u32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Gets the gas unit of the currently active calibration. See [GasUnit] for more
+    /// information
     pub fn get_current_gas_unit(&mut self) -> Result<GasUnit, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x13])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -274,6 +305,7 @@ impl<T: SerialPort> Device<T> {
         })
     }
 
+    /// Gets the full scale flow of the currently active calibration.
     pub fn get_current_full_scale(&mut self) -> Result<f32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x44, &[0x14])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -287,7 +319,8 @@ impl<T: SerialPort> Device<T> {
         Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
-    pub fn get_calliration_id(&mut self) -> Result<u32, DeviceError> {
+    /// Gets the calibration index of the currently active calibration.
+    pub fn get_calliration_number(&mut self) -> Result<u32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x45, &[])?;
         let _ = self.port.write(&frame.into_raw())?;
         let res = self.read_response()?;
@@ -300,6 +333,9 @@ impl<T: SerialPort> Device<T> {
         Ok(u32::from_be_bytes([data[0], data[1], data[2], data[3]]))
     }
 
+    /// Changes the calibration to the new calibration at the specified index. This command
+    /// stops the controller by closing the valve. Additonly this is stored in presitent memory and 
+    /// will remain after a device reset.
     pub fn set_callibration(&mut self, calibration_index: u32) -> Result<(), DeviceError> {
         let cal_bytes = calibration_index.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x45, &cal_bytes)?;
@@ -309,6 +345,9 @@ impl<T: SerialPort> Device<T> {
         Ok(())
     }
 
+    /// Changes the calibration to the new calibration at the specified index. This command stops
+    /// the controller by closing the valve. This will be started in volatile memory and will not 
+    /// presit after a device reset.
     pub fn set_callibration_volitile(&mut self, calibration_index: u32) -> Result<(), DeviceError> {
         let cal_bytes = calibration_index.to_be_bytes();
         let frame = MOSIFrame::new(self.slave_adress, 0x46, &cal_bytes)?;
@@ -317,6 +356,7 @@ impl<T: SerialPort> Device<T> {
         Ok(())
     }
 
+    /// Returns the slave adress of the SHDLC device
     pub fn get_slave_adress(&mut self) -> Result<u8, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x90, &[])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -329,6 +369,11 @@ impl<T: SerialPort> Device<T> {
         Ok(data[0])
     }
 
+    /// Sets slave adress of the SHDLC device. The slave adress is stored in non-volatile memory
+    /// and therefore will presist after a device reset. Next time the device is connected be sure 
+    /// to use the new address. Aditionally make sure there is only one device with this address on
+    /// the bus. Otherwise there will be communication errors that can only be fixed by
+    /// disconnecting one of the devices.
     pub fn set_slave_adress(&mut self, new_adress: u8) -> Result<(), DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x90, &[new_adress])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -338,6 +383,7 @@ impl<T: SerialPort> Device<T> {
         Ok(())
     }
 
+    /// Gets the baudrate of the SHDLC device.
     pub fn get_baudrate(&mut self) -> Result<u32, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x91, &[])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -354,6 +400,10 @@ impl<T: SerialPort> Device<T> {
         Ok(res)
     }
 
+    /// Sets the buadrate of the device. The buadrate is stored in non-volatile memory
+    /// and will presist after a device reset. The next time you connect to the device make 
+    /// sure to use the new baudrate. Allowed buadrate values are `19200`, `38400`, `57600`,
+    /// and `115200`.
     pub fn set_baudrate(&mut self, baudrate: u32) -> Result<(), DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x91, &baudrate.to_be_bytes())?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -364,6 +414,7 @@ impl<T: SerialPort> Device<T> {
         Ok(())
     }
 
+    /// Gets the product type from the device 
     pub fn get_product_type(&mut self) -> Result<String, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x00])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -380,6 +431,7 @@ impl<T: SerialPort> Device<T> {
         Ok(string)
     }
 
+    /// Gets the product name from the device
     pub fn get_product_name(&mut self) -> Result<String, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x01])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -396,6 +448,8 @@ impl<T: SerialPort> Device<T> {
 
     }
 
+    /// Gets the article code of the device. This information is also contained on the
+    /// product label.
     pub fn get_article_code(&mut self) -> Result<String, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x02])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -412,6 +466,8 @@ impl<T: SerialPort> Device<T> {
 
     }
 
+    /// Gets the serial number of the SFC6xxx sensor. This will not match the SN on 
+    /// the label of the device.
     pub fn get_serial_number(&mut self) -> Result<String, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x03])?;
         let data = frame.into_raw();
@@ -431,6 +487,7 @@ impl<T: SerialPort> Device<T> {
         Ok(string)
     }
 
+    /// Gets the version information for the hardware, firmware, and SHDLC protocol.
     pub fn get_version(&mut self) -> Result<Version, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0xD1, &[])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -451,6 +508,8 @@ impl<T: SerialPort> Device<T> {
         })
     }
 
+    /// Resets the device which has the same effect as a power cycle. Please allow 300ms for the 
+    /// device to power on
     pub fn reset_device(&mut self) -> Result<(), DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0xD3, &[])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -459,7 +518,7 @@ impl<T: SerialPort> Device<T> {
         Ok(())
     }
 
-    pub fn read_response(&mut self) -> Result<MISOFrame, DeviceError> {
+    fn read_response(&mut self) -> Result<MISOFrame, DeviceError> {
         let mut buff = [0_u8; 20];
         let mut out = ArrayVec::<u8, 518>::new();
         loop {
@@ -484,13 +543,18 @@ impl<T: SerialPort> Device<T> {
     }
 }
 
+/// Errors the device can encounter while operating
 #[derive(Debug)]
 pub enum DeviceError {
+    /// An error when writing data or reading data from the device.
     IoError(std::io::Error),
     ShdlcError(TranslationError),
     StateResponse(StateResponseError),
     PortError(serialport::Error),
+    /// The checksum recived was the first value when it expected the second
     InvalidChecksum(u8, u8),
+    /// An invalid string was sent from the device. Either missing the null terminator byte 
+    /// or was not valid ASCII.
     InvalidString,
 }
 
@@ -537,19 +601,33 @@ impl From<CapacityError> for DeviceError {
     }
 }
 
+/// Errors sent back from a MISO frame.
 #[derive(Debug, PartialEq)]
 pub enum StateResponseError {
+    /// Illegal data size of the MOSI frame. Either an invalid frame was sent or 
+    /// the firmware does not support the requested feature
     DataSizeError,
+    /// The device does not know this command.
     UnknownCommand,
+    /// A sent parameter is out of range.
     ParameterError,
+    /// NACK recived from the I2C device.
     I2CNackError,
+    /// Master hold not released in I2C.
     I2CMasterHoldError,
+    /// I2C CRC missmatch
     CRCError,
+    /// Sensor data read back differs from written value
     DataWriteError,
+    /// Sensor measure loop is not running or runs on wrong gas number.
     MeasureLoopNotRunning,
+    /// No valid gas calibration at given index
     InvalidCalibration,
+    /// The sensor is busy at the moment
     SensorBusy,
+    /// Command is not allwed in the current state.
     CommandNotAllowed,
+    /// An error without a specifc error code.
     FatalError,
 }
 
@@ -830,9 +908,9 @@ mod tests {
     #[ignore]
     fn set_and_reset_calibration() {
         let mut device = create_device();
-        let original = device.get_calliration_id().unwrap();
+        let original = device.get_calliration_number().unwrap();
         device.set_callibration(1).unwrap();
-        assert_eq!(1, device.get_calliration_id().unwrap());
+        assert_eq!(1, device.get_calliration_number().unwrap());
         device.set_callibration(original).unwrap();
     }
     
@@ -843,7 +921,7 @@ mod tests {
         device.set_callibration_volitile(2).unwrap();
         device.reset_device().unwrap();
         std::thread::sleep(std::time::Duration::from_millis(400));
-        assert_eq!(1, device.get_calliration_id().unwrap());
+        assert_eq!(1, device.get_calliration_number().unwrap());
     }
 
     #[test]
