@@ -559,8 +559,8 @@ impl<T: SerialPort> Device<T> {
         Ok(string)
     }
 
-    /// Gets the serial number of the SFC6xxx sensor. This will not match the SN on
-    /// the label of the device.
+    /// Gets the serial number of the SFC6xxx sensor as a hex String matching the 
+    /// serial number printed on the device.
     pub fn get_serial_number(&mut self) -> Result<String, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0xD0, &[0x03])?;
         let data = frame.into_raw();
