@@ -1,0 +1,1 @@
+/home/Charlotte/code/sfc6xxx-rs/target/debug/libsfc6xxx_rs.rlib: /home/Charlotte/code/sfc6xxx-rs/sfc6xxx-rs/src/device.rs /home/Charlotte/code/sfc6xxx-rs/sfc6xxx-rs/src/gasunit.rs /home/Charlotte/code/sfc6xxx-rs/sfc6xxx-rs/src/lib.rs /home/Charlotte/code/sfc6xxx-rs/sfc6xxx-rs/src/shdlc.rs

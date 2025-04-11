@@ -1,0 +1,1 @@
+/home/Charlotte/code/sfc6xxx-rs/target/debug/examples/quick-start: /home/Charlotte/code/sfc6xxx-rs/sfc6xxx-rs/examples/quick-start.rs /home/Charlotte/code/sfc6xxx-rs/sfc6xxx-rs/src/device.rs /home/Charlotte/code/sfc6xxx-rs/sfc6xxx-rs/src/gasunit.rs /home/Charlotte/code/sfc6xxx-rs/sfc6xxx-rs/src/lib.rs /home/Charlotte/code/sfc6xxx-rs/sfc6xxx-rs/src/shdlc.rs

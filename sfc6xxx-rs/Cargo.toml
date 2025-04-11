@@ -1,0 +1,13 @@
+[package]
+name = "sfc6xxx-rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Charlotte Crabtree <eggshark@eggshark.dev>"]
+
+[dependencies]
+arrayvec = "0.7.6"
+serialport = "4.7.0"
+
+[dev-dependencies]
+serial_test = "3.2.0"
+approx = "0.5.1"
