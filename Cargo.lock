@@ -363,6 +363,13 @@ dependencies = [
 [[package]]
 name = "sfc-core"
 version = "0.1.0"
+dependencies = [
+ "arrayvec",
+]
+
+[[package]]
+name = "sfc5xxx-rs"
+version = "0.1.0"
 
 [[package]]
 name = "sfc6xxx-rs"
@@ -372,6 +379,7 @@ dependencies = [
  "arrayvec",
  "serial_test",
  "serialport",
+ "sfc-core",
 ]
 
 [[package]]

@@ -6,8 +6,8 @@ use std::fmt::Display;
 use arrayvec::{ArrayVec, CapacityError};
 use serialport::SerialPort;
 
-use crate::gasunit::{GasUnit, Prefixes, TimeBases, Units};
-use crate::shdlc::{MISOFrame, MOSIFrame, TranslationError, Version};
+use sfc_core::gasunit::{GasUnit, Prefixes, TimeBases, Units};
+use sfc_core::shdlc::{MISOFrame, MOSIFrame, TranslationError, Version};
 
 /// A representation of a physical SFC6XXX. It must be given a valid serial port
 /// in order to operate.

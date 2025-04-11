@@ -1,3 +1,3 @@
 [workspace]
 resolver = "2"
-members = [ "sfc-core","sfc6xxx-rs"]
+members = [ "sfc-core", "sfc5xxx-rs","sfc6xxx-rs"]

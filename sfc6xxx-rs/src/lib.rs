@@ -10,7 +10,4 @@
 //! cannot be accuratley tested. In these cases the code checks to see if the response errored and nothing else.
 
 pub mod device;
-pub mod gasunit;
-pub mod shdlc;
-
 pub use serialport;
