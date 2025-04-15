@@ -365,11 +365,19 @@ name = "sfc-core"
 version = "0.1.0"
 dependencies = [
  "arrayvec",
+ "serialport",
 ]
 
 [[package]]
 name = "sfc5xxx-rs"
 version = "0.1.0"
+dependencies = [
+ "approx",
+ "arrayvec",
+ "serial_test",
+ "serialport",
+ "sfc-core",
+]
 
 [[package]]
 name = "sfc6xxx-rs"
