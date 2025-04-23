@@ -7,6 +7,7 @@ use sfc_core::error::{DeviceError, StateResponseError};
 use std::ffi::CString;
 
 use crate::scaling::Scale;
+use crate::valve_config::InputSourceConfig;
 
 pub struct Device<T: SerialPort> {
     port: T,
@@ -199,6 +200,89 @@ impl<T: SerialPort> Device<T> {
         }
 
         Ok(BufferedRead::new(&data))
+    }
+
+    /// TODO: make feature flag for V1.48
+    pub fn read_measured_flow_two_sensors(&mut self, scale: Scale) -> Result<(f32, f32), DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x0A, &[scale as u8])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 8 {
+            Err(TranslationError::NotEnoughData(8, data.len() as u8))?;
+        }
+        let sensor_1_data = f32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+        let sensor_2_data = f32::from_be_bytes([data[4], data[5], data[6], data[7]]);
+        Ok((sensor_1_data, sensor_2_data))
+    }
+
+    pub fn set_setpoint_and_read_measured_value(&mut self, scale: Scale, setpoint: f32) -> Result<f32, DeviceError> {
+        let setpoint_bytes = setpoint.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x03, &[scale as u8, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    /// TODO: make feature flag for V1.48
+    pub fn set_setpoint_and_read_measured_value_two_sensors(&mut self, scale: Scale, setpoint: f32) -> Result<(f32, f32), DeviceError> {
+        let setpoint_bytes = setpoint.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x04, &[scale as u8, setpoint_bytes[0], setpoint_bytes[1], setpoint_bytes[2], setpoint_bytes[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 8 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+
+        let sensor_1_data = f32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+        let sensor_2_data = f32::from_be_bytes([data[4], data[5], data[6], data[7]]);
+        Ok((sensor_1_data, sensor_2_data))
+    }
+
+    pub fn make_setpoint_persistant(&mut self, persist: bool) -> Result<(), DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x02, &[0x00, persist as u8])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+        
+        Ok(())
+    }
+
+    pub fn is_setpoint_persistant(&mut self) -> Result<bool, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x02, &[0x00])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+        
+        if data.is_empty() {
+            Err(TranslationError::NotEnoughData(1, 0))?;
+        }
+
+        Ok(data[0] == 1)
+    }
+
+    pub fn set_valve_input_source(&mut self, config: InputSourceConfig) -> Result<(), DeviceError> {
+        let frame = match config {
+            InputSourceConfig::Hold | InputSourceConfig::Controller | InputSourceConfig::ForceOpen | InputSourceConfig::ForceClosed 
+                => MOSIFrame::new(self.slave_address, 0x20, &[0, config.into()])?,
+            InputSourceConfig::UserDefined(v) => {
+                let data_bytes = v.to_be_bytes();
+                MOSIFrame::new(self.slave_address, 0x020, &[1, data_bytes[0], data_bytes[1], data_bytes[2], data_bytes[3]])?
+            }
+        };
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+
+        Ok(())
+    }
+
+    pub fn get_valve_input_source(&mut self) -> Result<InputSourceConfig, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x20, &[])?;
+        todo!()
     }
 
     fn read_response(&mut self) -> Result<MISOFrame, DeviceError> {
