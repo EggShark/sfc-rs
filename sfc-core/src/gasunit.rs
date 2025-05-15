@@ -69,6 +69,35 @@ impl From<i8> for Prefixes {
     }
 }
 
+impl From<Prefixes> for i8 {
+    fn from(value: Prefixes) -> Self {
+        match value {
+            Prefixes::Yocto => -24,
+            Prefixes::Zepto => -21,
+            Prefixes::Atto => -18,
+            Prefixes::Femto => -15,
+            Prefixes::Pico => -12,
+            Prefixes::Nano => -9,
+            Prefixes::Micro => -6,
+            Prefixes::Milli => -3,
+            Prefixes::Centi => -2,
+            Prefixes::Deci => -1,
+            Prefixes::Base => 0,
+            Prefixes::Deca => 1,
+            Prefixes::Hecto => 2,
+            Prefixes::Kilo => 3,
+            Prefixes::Mega => 6,
+            Prefixes::Giga => 9,
+            Prefixes::Tera => 12,
+            Prefixes::Peta => 15,
+            Prefixes::Exa => 18,
+            Prefixes::Zetta => 21,
+            Prefixes::Yotta => 24,
+            Prefixes::Undefined => 0x7F,
+        }
+    }
+}
+
 impl Display for Prefixes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -128,6 +157,22 @@ impl From<u8> for Units {
     }
 }
 
+impl From<Units> for u8 {
+    fn from(value: Units) -> Self {
+        match value {
+            Units::NormLiter => 0,
+            Units::StandardLiter => 1,
+            Units::LiterLiquid => 8,
+            Units::Gram => 9,
+            Units::Pascal => 16,
+            Units::Bar => 17,
+            Units::MeterH20 => 18,
+            Units::InchH20 => 19,
+            Units::Undefined => 0xFF,
+        }
+    }
+}
+
 impl Display for Units {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -166,6 +211,21 @@ impl From<u8> for TimeBases {
             5 => Self::Hour,
             6 => Self::Day,
             _ => Self::Undefined,
+        }
+    }
+}
+
+impl From<TimeBases> for u8 {
+    fn from(value: TimeBases) -> Self {
+        match value {
+            TimeBases::None => 0,
+            TimeBases::Microsecond => 1,
+            TimeBases::Milisecond => 2,
+            TimeBases::Second => 3,
+            TimeBases::Minute => 4,
+            TimeBases::Hour => 5,
+            TimeBases::Day => 6,
+            TimeBases::Undefined => 0xFF,
         }
     }
 }
