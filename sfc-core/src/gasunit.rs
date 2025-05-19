@@ -13,6 +13,16 @@ pub struct GasUnit {
     pub timebase: TimeBases,
 }
 
+impl GasUnit {
+    pub fn from_be_bytes(bytes: [u8; 3]) -> Self {
+        Self {
+            unit_prefex: i8::from_be_bytes([bytes[0]]).into(),
+            medium_unit: bytes[1].into(),
+            timebase: bytes[2].into()
+        }
+    }
+}
+
 /// SI prefixes that the device can transmit
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum Prefixes {
