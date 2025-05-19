@@ -1,6 +1,7 @@
 use arrayvec::ArrayVec;
 use serialport::SerialPort;
 
+use sfc_core::gasunit::GasUnit;
 use sfc_core::shdlc::{MISOFrame, MOSIFrame, TranslationError, Version};
 use sfc_core::error::{DeviceError, StateResponseError};
 
@@ -8,6 +9,24 @@ use std::ffi::CString;
 
 use crate::scaling::Scale;
 use crate::valve_config::InputSourceConfig;
+use crate::calibration::CalibrationCondition;
+
+macro_rules! simple_device_function {
+    ($name:ident, $ret_type:ty, $code:literal, $($data:literal),*) => {
+       pub fn $name(&mut self) -> Result<$ret_type, DeviceError> {
+           let frame = MOSIFrame::new(self.slave_address, $code, &[$($data,)*])?;
+           let _ = self.port.write(&frame.into_raw())?;
+           let data = self.read_response()?.into_data();
+
+           if data.len() < std::mem::size_of::<$ret_type>() {
+               return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(std::mem::size_of::<$ret_type>() as u8, data.len() as u8)));
+           }
+
+           let bytes_deffined: [u8; core::mem::size_of::<$ret_type>()] = core::array::from_fn(|i| data[i]);
+           Ok(<$ret_type>::from_be_bytes(bytes_deffined))
+       }
+    };
+}
 
 pub struct Device<T: SerialPort> {
     port: T,
@@ -266,23 +285,379 @@ impl<T: SerialPort> Device<T> {
     }
 
     pub fn set_valve_input_source(&mut self, config: InputSourceConfig) -> Result<(), DeviceError> {
-        let frame = match config {
-            InputSourceConfig::Hold | InputSourceConfig::Controller | InputSourceConfig::ForceOpen | InputSourceConfig::ForceClosed 
-                => MOSIFrame::new(self.slave_address, 0x20, &[0, config.into()])?,
-            InputSourceConfig::UserDefined(v) => {
-                let data_bytes = v.to_be_bytes();
-                MOSIFrame::new(self.slave_address, 0x020, &[1, data_bytes[0], data_bytes[1], data_bytes[2], data_bytes[3]])?
-            }
-        };
+        let frame = MOSIFrame::new(self.slave_address, 0x20, &[0x00, config.into()])?;
         let _ = self.port.write(&frame.into_raw())?;
         let _ = self.read_response()?;
+        use InputSourceConfig::*;
+        match config {
+            Controller | ForceClosed | ForceOpen | Hold => Ok(()),
+            UserDefined(value) => self.set_user_input_source(value),
+        }
+    }
 
+    fn set_user_input_source(&mut self, value: f32) -> Result<(), DeviceError> {
+        let value_b = value.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x20, &[0x01, value_b[0], value_b[1], value_b[2], value_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
         Ok(())
     }
 
     pub fn get_valve_input_source(&mut self) -> Result<InputSourceConfig, DeviceError> {
-        let frame = MOSIFrame::new(self.slave_address, 0x20, &[])?;
-        todo!()
+        let frame = MOSIFrame::new(self.slave_address, 0x20, &[0x00])?;
+        let _ =  self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+        if data.is_empty() {
+            Err(TranslationError::NotEnoughData(1, 0))?;
+        }
+        match data[0] {
+            0x00 => Ok(InputSourceConfig::Controller),
+            0x01 => Ok(InputSourceConfig::ForceClosed),
+            0x02 => Ok(InputSourceConfig::ForceOpen),
+            0x03 => Ok(InputSourceConfig::Hold),
+            0x10 => self.get_user_input_value(),
+            _ => unreachable!(),
+        }
+    }
+
+    fn get_user_input_value(&mut self) -> Result<InputSourceConfig, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x20, &[0x01])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+        if data.len() < 4 {
+            Err(TranslationError::NotEnoughData(4, data.len() as u8))?;
+        }
+        let value = f32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+        Ok(InputSourceConfig::UserDefined(value))
+    }
+
+    pub fn set_medium_unit_configuration(&mut self, unit: GasUnit) -> Result<(), DeviceError> {
+       let frame = MOSIFrame::new(self.slave_address, 0x21, &[0x00, Into::<i8>::into(unit.unit_prefex).to_le_bytes()[0], unit.medium_unit.into(), unit.timebase.into()])?;
+       let _ = self.port.write(&frame.into_raw())?;
+       let _ = self.read_response()?;
+
+       Ok(())
+    }
+
+    pub fn get_medium_unit_configuration(&mut self, include_wild_cards: bool) -> Result<GasUnit, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x21, &[include_wild_cards.into()])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 3 {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(3, data.len() as u8)));
+        }
+
+        Ok(GasUnit {
+            unit_prefex: i8::from_be_bytes([data[0]]).into(),
+            medium_unit: data[1].into(),
+            timebase: data[2].into(),
+        })
+    }
+
+    pub fn get_converted_fullscale(&mut self) -> Result<f32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x21, &[0x0A])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+        if data.len() < 4 {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(4, data.len() as u8)));
+        }
+
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn set_user_controller_gain(&mut self, gain: f32) -> Result<(), DeviceError> {
+        let gain_b = gain.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x22, &[0x00, gain_b[0], gain_b[1], gain_b[2], gain_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+        Ok(())
+    }
+
+    
+    pub fn set_pressure_dependant_gain_enable(&mut self, enabled: bool) -> Result<(), DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x22, &[0x10, enabled.into()])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+        Ok(())
+    }
+
+    // inlet pressure is in bar
+    pub fn set_gain_correction(&mut self, inlet_pressure: f32) -> Result<(), DeviceError> {
+        let pressure_b = inlet_pressure.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x22, &[0x11, pressure_b[0], pressure_b[1], pressure_b[2], pressure_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+        Ok(())
+    }
+
+    pub fn set_gas_temperature_enable(&mut self, enabled: bool) -> Result<(), DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x22, &[0x20, enabled.into()])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+        Ok(())
+    }
+
+    pub fn set_inlet_temperature_correction(&mut self, temperature: f32) -> Result<(), DeviceError> {
+        let temp_b = temperature.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x22, &[0x21, temp_b[0], temp_b[1], temp_b[2], temp_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+        Ok(())
+    }
+
+    pub fn get_user_controller_gain(&mut self) -> Result<f32, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x22, &[0x00])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 4 {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(4, data.len() as u8)));
+        }
+
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn get_pressure_dependant_gain(&mut self) -> Result<Option<f32>, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x22, &[0x10])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.is_empty() {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(1, 0)));
+        }
+
+        if data[0] == 0 {
+            return Ok(None);
+        }
+
+        let frame = MOSIFrame::new(self.slave_address, 0x022, &[0x11])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+        if data.len() < 4 {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(1, 0)));
+        }
+        
+        Ok(Some(f32::from_be_bytes([data[0], data[1], data[2], data[3]])))
+    }
+
+    pub fn get_gas_temperature_compensation(&mut self) -> Result<Option<f32>, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x22, &[0x20])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.is_empty() {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(1, 0)));
+        }
+        if data[0] == 0 {
+            return Ok(None);
+        }
+
+        let frame = MOSIFrame::new(self.slave_address, 0x22, &[0x21])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 4 {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(4, data.len() as u8)));
+        }
+
+        Ok(Some(f32::from_be_bytes([data[0], data[1], data[2], data[3]])))
+    }
+
+    pub fn measure_raw_flow(&mut self) -> Result<u16, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x30, &[0x00])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 2 {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(2, data.len() as u8)));
+        }
+
+        Ok(u16::from_be_bytes([data[0], data[1]]))
+    }
+    
+    pub fn measure_raw_thermal_conductivity(&mut self, valve_closed: bool) -> Result<u16, DeviceError> {
+        let d1 = if valve_closed {0x01} else {0x02};
+        let frame = MOSIFrame::new(self.slave_address, 0x30, &[d1])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 2 {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(2, data.len() as u8)));
+        }
+
+        Ok(u16::from_be_bytes([data[0], data[1]]))
+    }
+
+    simple_device_function!{measure_temperature, f32, 0x30, 0x10}
+
+    pub fn set_callibration(&mut self, index: u32) -> Result<(), DeviceError> {
+        let index_b = index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x45, &index_b)?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+        Ok(())
+    }
+
+    simple_device_function!(get_number_of_calibrations, u32, 0x40, 0x00);
+
+    pub fn get_calibration_validity(&mut self, index: u32) -> Result<bool, DeviceError> {
+        let index_b = index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x40, &[0x10, index_b[0], index_b[1], index_b[2], index_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.is_empty() {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(1, 0)))
+        }
+
+        Ok(data[0] > 0)
+    }
+
+    pub fn get_calibration_gas_description(&mut self, index: u32) -> Result<String, DeviceError> {
+        let index_b = index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x40, &[0x11, index_b[0], index_b[1], index_b[2], index_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data =  self.read_response()?.into_data();
+        
+        let string = match CString::from_vec_with_nul(data.to_vec()) {
+            Ok(s) => match s.into_string() {
+                Ok(st) => st,
+                Err(_) => Err(DeviceError::InvalidString)?,
+            },
+            Err(_) => Err(DeviceError::InvalidString)?,
+        };
+        Ok(string)
+    }
+
+    pub fn get_calibration_gas_id(&mut self, index: u32) -> Result<u32, DeviceError> {
+        let index_b = index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x40, &[0x12, index_b[0], index_b[1], index_b[2], index_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 4 {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(4, data.len() as u8)));
+        }
+
+        Ok(u32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn get_calibration_gas_unit(&mut self, index: u32) -> Result<GasUnit, DeviceError> {
+        let index_b = index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x40, &[0x13, index_b[0], index_b[1], index_b[2], index_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 3 {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(3, data.len() as u8)));
+        }
+
+        Ok(GasUnit {
+            unit_prefex: i8::from_be_bytes([data[0]]).into(),
+            medium_unit: data[1].into(),
+            timebase: data[2].into(),
+        })
+    }
+
+    pub fn get_calibration_fullscale(&mut self, index: u32) -> Result<f32, DeviceError> {
+        let index_b = index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x40, &[0x14, index_b[0], index_b[1], index_b[2], index_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 4 {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(4, data.len() as u8)));
+        }
+
+        Ok(f32::from_be_bytes([data[0], data[1], data[2], data[3]]))
+    }
+
+    pub fn get_calibration_initial_conditions(&mut self, index: u32) -> Result<CalibrationCondition, DeviceError> {
+        let index_b = index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x40, &[0x15, index_b[0], index_b[1], index_b[2], index_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let res_frame = self.read_response()?;
+
+        CalibrationCondition::from_miso(res_frame)
+    }
+
+    pub fn get_calibration_recalibration_conditions(&mut self, index: u32) -> Result<CalibrationCondition, DeviceError> {
+        let index_b = index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x40, &[0x16, index_b[0], index_b[1], index_b[2], index_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let res_frame = self.read_response()?;
+
+        CalibrationCondition::from_miso(res_frame)
+    }
+
+    pub fn get_calibration_thermal_conductivity_refrence(&mut self, index: u32) -> Result<u16, DeviceError> {
+        let index_b = index.to_be_bytes();
+        let frame = MOSIFrame::new(self.slave_address, 0x40, &[0x16, index_b[0], index_b[1], index_b[2], index_b[3]])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        if data.len() < 2 {
+            return Err(DeviceError::ShdlcError(TranslationError::NotEnoughData(2, data.len() as u8)));
+        }
+
+        Ok(u16::from_be_bytes([data[0], data[1]]))
+    }
+
+    pub fn get_current_gas_description(&mut self) -> Result<String, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x44, &[0x11])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+        
+        let string = match CString::from_vec_with_nul(data.to_vec()) {
+            Ok(s) => match s.into_string() {
+                Ok(st) => st,
+                Err(_) => Err(DeviceError::InvalidString)?,
+            },
+            Err(_) => Err(DeviceError::InvalidString)?,
+        };
+        Ok(string)
+    }
+
+    simple_device_function!(get_current_gas_id, u32, 0x44, 0x12);
+    simple_device_function!(get_current_gas_unit, GasUnit, 0x44, 0x13);
+    simple_device_function!(get_current_fullscale, f32, 0x44, 0x14);
+
+    pub fn get_current_initial_calibration_conditions(&mut self) -> Result<CalibrationCondition, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x44, &[0x15])?;
+        let _ = self.port.write(&frame.into_raw());
+        let res_frame = self.read_response()?;
+
+        CalibrationCondition::from_miso(res_frame)
+    }
+
+    pub fn get_current_recalibration_condition(&mut self) -> Result<CalibrationCondition, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x44, &[0x16])?;
+        let _ = self.port.write(&frame.into_raw());
+        let res_frame = self.read_response()?;
+
+        CalibrationCondition::from_miso(res_frame)
+    }
+
+    simple_device_function!(get_current_thermal_conducitvity_refrence, u16, 0x44, 0x17);
+
+    pub fn read_user_memory(&mut self, start_address: u8, bytes_to_read: u8) -> Result<Vec<u8>, DeviceError> {
+        let frame = MOSIFrame::new(self.slave_address, 0x6E, &[start_address, bytes_to_read])?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let data = self.read_response()?.into_data();
+
+        Ok(data.to_vec())
+    }
+
+    pub fn write_user_memory(&mut self, start_address: u8, data: &[u8]) -> Result<(), DeviceError> {
+        let len = data.len() as u8;
+        let mut  frame_data = vec![start_address, len];
+        frame_data.extend_from_slice(data);
+        let frame = MOSIFrame::new(self.slave_address, 0x6E, &frame_data)?;
+        let _ = self.port.write(&frame.into_raw())?;
+        let _ = self.read_response()?;
+
+        Ok(())
     }
 
     fn read_response(&mut self) -> Result<MISOFrame, DeviceError> {
