@@ -1,8 +1,13 @@
 [package]
 name = "sfc-core"
+description = "Core utilities for controlling Sensirion's SFC mass flow controllers"
+authors = ["Charlotte Crabtree <eggshark@eggshark.dev>"]
+keywords = ["sfc-core", "sensirion", "mass flow controller"]
+license = "MIT"
+readme = "README.md"
 version = "0.1.0"
 edition = "2024"
-
+categories = ["science"]
 [dependencies]
 arrayvec = "0.7.6"
 serialport = "4.7.0"

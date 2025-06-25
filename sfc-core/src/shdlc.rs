@@ -5,13 +5,19 @@ use std::fmt::Display;
 
 use arrayvec::{ArrayVec, CapacityError};
 
+/// Denotes the begining and end of a data frame
 pub const START_STOP: u8 = 0x7E;
+/// Replaces the Start/Stop byte when escaped with the [ESCAPE] byte
 pub const START_SWAP: u8 = 0x5E;
+/// Used to escape "special" bytes like [START_STOP] and [XON]
 pub const ESCAPE: u8 = 0x7D;
+/// Replaces the [ESCAPE] byte when escaped
 pub const ESCAPE_SWAP: u8 = 0x5D;
 pub const XON: u8 = 0x11;
+/// Replaces [XON] when scaped with the [ESCAPE] byte
 pub const XON_SWAP: u8 = 0x31;
 pub const XOFF: u8 = 0x13;
+/// Replaced [XOFF] when escaped with the [ESCAPE] byte
 pub const XOFF_SWAP: u8 = 0x33;
 
 /// A representation of a SHDLC Master Out Slave In frame.
@@ -159,7 +165,8 @@ pub fn calculate_check_sum(data: &[u8]) -> u8 {
     data.iter().fold(0, |acc: u8, x| acc.wrapping_add(*x)) ^ 0xFF_u8
 }
 
-/// Does the byte stuffing operations in order to send data to the physical device
+/// Converts a standard data array to a valid data stream for the device by applying byte stuffing. 
+/// Also appends the needed [START_STOP] bytes to the begining and end of the data frame.
 pub fn to_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 518>, TranslationError> {
     let mut out = ArrayVec::new();
 
@@ -318,5 +325,19 @@ mod tests {
         let vec = vec![0_u8; 1000];
         let attempt = from_shdlc(&vec);
         assert_eq!(attempt, Err(TranslationError::DataTooLarge));
+    }
+
+    #[test]
+    fn stop_frame_in_data() {
+        let data = [00, 00, 0x7E, 00, 00, 1];
+        let attempt = from_shdlc(&data);
+        assert_eq!(attempt, Err(TranslationError::FrameEndInData));
+    }
+
+    #[test]
+    fn unescaped_data() {
+        let data = [00, 00, ESCAPE, 90, 23];
+        let attempt = from_shdlc(&data);
+        assert_eq!(attempt, Err(TranslationError::MissingEscapedData(90)));
     }
 }
