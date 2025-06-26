@@ -1,8 +1,16 @@
 [package]
 name = "sfc6xxx-rs"
 version = "0.1.0"
-edition = "2021"
+description = "A pure rust implementation of the SHDLC driver for sensirion's SFC6XXX mass flow controllers"
 authors = ["Charlotte Crabtree <eggshark@eggshark.dev>"]
+keywords = ["sfc6xxx", "sensirion", "mass flow controller"]
+license = "MIT"
+readme = "README.md"
+version = "0.1.0"
+edition = "2024"
+categories = ["science"]
+repository = "https://github.com/EggShark/sfc-rs"
+
 
 [dependencies]
 arrayvec = "0.7.6"
