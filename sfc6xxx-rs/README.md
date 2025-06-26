@@ -9,3 +9,6 @@ device.set_setpoint(4).unwrap();
 device.read_measured_value();
 
 ```
+
+### Testing
+All device functions have an assoicated test that were passing on a SFC6000D-5slm

@@ -5,7 +5,7 @@ use std::ffi::CString;
 use arrayvec::ArrayVec;
 use serialport::SerialPort;
 
-pub use sfc_core::error::{DeviceError, StateResponseError};
+use sfc_core::error::{DeviceError, StateResponseError};
 use sfc_core::gasunit::{GasUnit, Prefixes, TimeBases, Units};
 use sfc_core::shdlc::{MISOFrame, MOSIFrame, TranslationError, Version};
 

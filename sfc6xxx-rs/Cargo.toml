@@ -6,7 +6,6 @@ authors = ["Charlotte Crabtree <eggshark@eggshark.dev>"]
 keywords = ["sfc6xxx", "sensirion", "mass flow controller"]
 license = "MIT"
 readme = "README.md"
-version = "0.1.0"
 edition = "2024"
 categories = ["science"]
 repository = "https://github.com/EggShark/sfc-rs"

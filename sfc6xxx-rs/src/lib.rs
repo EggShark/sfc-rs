@@ -11,3 +11,4 @@
 
 pub mod device;
 pub use serialport;
+pub use sfc_core;
