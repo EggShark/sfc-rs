@@ -3,9 +3,8 @@
 
 use std::fmt::Display;
 
-/// Returned from [get_calibration_gas_unit](crate::device::Device::get_calibration_gas_unit)
-/// and [get_current_gas_unit](crate::device::Device::get_current_gas_unit)
-/// representing the calibrations units per time.
+/// Struct that contains A base unit its SI prefix and the time base such as centimeter per
+/// minute. Often used when checking current calibration settings of a device. 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GasUnit {
     pub unit_prefex: Prefixes,

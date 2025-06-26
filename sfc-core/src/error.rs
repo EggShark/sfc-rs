@@ -1,9 +1,13 @@
+//! Contains error types that can occur when attempting to communicate with the mass flow
+//! controller.
 use crate::shdlc::TranslationError;
 
 use arrayvec::CapacityError;
 
 use std::fmt::Display;
 
+/// An aggregate error type that covers every error that can occur when attempting to communicate 
+/// with the mass flow controller.
 #[derive(Debug)]
 pub enum DeviceError {
     /// An error when writing data or reading data from the device.

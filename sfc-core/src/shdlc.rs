@@ -271,9 +271,8 @@ impl<T> From<CapacityError<T>> for TranslationError {
     }
 }
 
-/// Each device has version information that is returned from
-/// [get_version](crate::device::Device::get_version). There is a major
-/// and minor version for the firmware, hardware, and protocol. Additionly
+/// Each device has version information that can be retrieved. there is a major
+/// and minor version for the firmware, hardware, and protocol. Additionally
 /// there is a flag that states wether or not the device's firmware is in
 /// debug mode
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
