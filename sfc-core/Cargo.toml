@@ -8,6 +8,8 @@ readme = "README.md"
 version = "0.1.0"
 edition = "2024"
 categories = ["science"]
+repository = "https://github.com/EggShark/sfc-rs"
+
 [dependencies]
 arrayvec = "0.7.6"
 serialport = "4.7.0"
