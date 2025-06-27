@@ -15,7 +15,8 @@ pub enum DeviceError {
     ShdlcError(TranslationError),
     StateResponse(StateResponseError),
     PortError(serialport::Error),
-    /// The checksum recived was the first value when it expected the second
+    /// An Invalid Checksum. The first value of the tuple is the recivied checksum and the second
+    /// value was the expected checksum.
     InvalidChecksum(u8, u8),
     /// An invalid string was sent from the device. Either missing the null terminator byte
     /// or was not valid ASCII.

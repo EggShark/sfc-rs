@@ -1,9 +1,9 @@
-//! Gas calbrtions come with units of measurments. The format is a (SI prefix * Flow unit)/Time
+//! Gas calibrations come with units of measurments. The format is a (SI prefix * Flow unit)/Time
 //! Unit
 
 use std::fmt::Display;
 
-/// Struct that contains A base unit its SI prefix and the time base such as centimeter per
+/// GasUnit contains a base unit its SI prefix and the time base such as: centimeter per
 /// minute. Often used when checking current calibration settings of a device. 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GasUnit {

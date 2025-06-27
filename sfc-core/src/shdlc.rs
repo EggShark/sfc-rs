@@ -1,11 +1,11 @@
-//! Functions and structs relating to the underlying SHDLC protocol deffintions of these types can
+//! Functions and structs relating to the underlying SHDLC protocol definition of these types can
 //! be seen [here](https://sensirion.com/media/documents/88CA2961/65156AEC/GF_AN_SFX6000_SHDLCGuide1.1.pdf)
 
 use std::fmt::Display;
 
 use arrayvec::{ArrayVec, CapacityError};
 
-/// Denotes the begining and end of a data frame
+/// Denotes the beginning and end of a data frame
 pub const START_STOP: u8 = 0x7E;
 /// Replaces the Start/Stop byte when escaped with the [ESCAPE] byte
 pub const START_SWAP: u8 = 0x5E;
@@ -14,15 +14,15 @@ pub const ESCAPE: u8 = 0x7D;
 /// Replaces the [ESCAPE] byte when escaped
 pub const ESCAPE_SWAP: u8 = 0x5D;
 pub const XON: u8 = 0x11;
-/// Replaces [XON] when scaped with the [ESCAPE] byte
+/// Replaces [XON] when escaped with the [ESCAPE] byte
 pub const XON_SWAP: u8 = 0x31;
 pub const XOFF: u8 = 0x13;
 /// Replaced [XOFF] when escaped with the [ESCAPE] byte
 pub const XOFF_SWAP: u8 = 0x33;
 
 /// A representation of a SHDLC Master Out Slave In frame.
-/// Each frame contains a 1 byte Frame start/end symbol. The slave adress of the device.
-/// The command byte. The length of the data being 0-255. The actuall data a checksum followed
+/// Each frame contains a Frame start byte. The slave address of the device.
+/// The command byte. The length of the data being transmitted. The actual data, a checksum followed
 /// by the Frame end byte.
 pub struct MOSIFrame {
     address: u8,
@@ -73,7 +73,7 @@ impl MOSIFrame {
         self.checksum
     }
 
-    /// returns the underlying ArrayVec ready to be written to the device
+    /// Returns the underlying ArrayVec ready to be written to the device
     pub fn into_raw(self) -> ArrayVec<u8, 518> {
         self.raw
     }
@@ -86,10 +86,9 @@ impl MOSIFrame {
     }
 }
 
-/// The Master In Slave Out frame or the response from the device. Simillar
-/// to the MOSI frame it begins with a start byte. The slave adress of the
-/// responding device. The command number byte. The State byte. The data length.
-/// Followed by the data, the checksum and a stop byte.
+/// The Master In Slave Out frame or the response from the device starts with a start byte.
+/// Follwed by the slave adress of the responding device, the command number byte,
+/// the State byte, the data length, followed by the data, the checksum and finslly, a stop byte.
 #[derive(Debug)]
 pub struct MISOFrame {
     address: u8,
@@ -101,7 +100,7 @@ pub struct MISOFrame {
 }
 
 impl MISOFrame {
-    /// parses the data from raw bytes should come from a bytestream of the device
+    /// Parses the data from raw bytes should come from a bytestream of the device
     pub fn from_bytes(data: &[u8]) -> Self {
         let decoded = from_shdlc(data).unwrap();
         let address = decoded[0];
@@ -149,7 +148,7 @@ impl MISOFrame {
         ck
     }
 
-    /// validates the checksum from the device
+    /// Validates the checksum from the device
     pub fn validate_checksum(&self) -> bool {
         self.calculate_check_sum() == self.checksum
     }
@@ -234,7 +233,8 @@ pub fn from_shdlc(data: &[u8]) -> Result<ArrayVec<u8, 262>, TranslationError> {
 pub enum TranslationError {
     /// Too much data was supplied. Data frame was larger than 255 bytes long
     DataTooLarge,
-    /// There was not enough data. First value is expected number second value is found number
+    /// The data found was less than the length of the data exepected. The first number in the
+    /// tuple corresponds to expected data length and the second value is the actual data length.
     NotEnoughData(u8, u8),
     /// The escape byte 0x7D was encountered but a valid swap character was not found
     MissingEscapedData(u8),
@@ -271,9 +271,9 @@ impl<T> From<CapacityError<T>> for TranslationError {
     }
 }
 
-/// Each device has version information that can be retrieved. there is a major
+/// Each device has version information that can be retrieved. There is a major
 /// and minor version for the firmware, hardware, and protocol. Additionally
-/// there is a flag that states wether or not the device's firmware is in
+/// there is a flag that states whether or not the device's firmware is in
 /// debug mode
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Version {

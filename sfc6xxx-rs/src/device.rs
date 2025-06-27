@@ -24,6 +24,8 @@ impl<T: SerialPort> Device<T> {
     /// let test_port = serialport::new("ttyUSB0", 115200).open_native().unwrap();
     /// let device = Device::new(test_port, 0).unwrap();
     /// ```
+    /// This function also sends the [Device::get_baudrate] command to ensure
+    /// its connected to a valid shdlc device.
     pub fn new(mut serial_port: T, slave_adress: u8) -> Result<Self, DeviceError> {
         serial_port.set_timeout(std::time::Duration::from_millis(600))?;
 
@@ -200,7 +202,7 @@ impl<T: SerialPort> Device<T> {
         Ok(())
     }
 
-    /// Retunrs the measured flow in raw ticks
+    /// Returns the measured flow in raw ticks
     pub fn measure_raw_flow(&mut self) -> Result<u16, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x00])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -213,8 +215,8 @@ impl<T: SerialPort> Device<T> {
         Ok(u16::from_be_bytes([data[0], data[1]]))
     }
 
-    /// Preforms a thermal conductivity measurement and returns the measure raw tick value.
-    /// The valve is automatically closed during the measurment
+    /// Preforms a thermal conductivity measurement and returns the measured raw tick value.
+    /// The valve is automatically closed during the measurement
     pub fn measure_raw_thermal_conductivity(&mut self) -> Result<u16, DeviceError> {
         let frame = MOSIFrame::new(self.slave_adress, 0x30, &[0x02])?;
         let _ = self.port.write(&frame.into_raw())?;
@@ -441,7 +443,7 @@ impl<T: SerialPort> Device<T> {
     }
 
     /// Changes the calibration to the new calibration at the specified index. This command stops
-    /// the controller by closing the valve. This will be started in volatile memory and will not
+    /// the controller by closing the valve. This will be stored in volatile memory and will not
     /// presit after a device reset.
     pub fn set_callibration_volitile(&mut self, calibration_index: u32) -> Result<(), DeviceError> {
         let cal_bytes = calibration_index.to_be_bytes();
