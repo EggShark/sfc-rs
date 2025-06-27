@@ -2,7 +2,7 @@
 name = "sfc-core"
 description = "Core utilities for controlling Sensirion's SFC mass flow controllers"
 authors = ["Charlotte Crabtree <eggshark@eggshark.dev>"]
-keywords = ["sfc-core", "sensirion", "mass flow controller"]
+keywords = ["sfc-core", "sensirion", "mass-flow-controller"]
 license = "MIT"
 readme = "README.md"
 version = "0.1.0"
