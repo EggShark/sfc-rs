@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 arrayvec = "0.7.6"
 serialport = "4.7.0"
-sfc-core = {path="../sfc-core"}
+sfc-core = "0.1.0"
 
 [dev-dependencies]
 serial_test = "3.2.0"
