@@ -397,7 +397,7 @@ dependencies = [
  "arrayvec",
  "serial_test",
  "serialport",
- "sfc-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sfc-core 0.1.0",
 ]
 
 [[package]]

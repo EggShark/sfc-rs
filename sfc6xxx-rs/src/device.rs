@@ -627,7 +627,7 @@ impl<T: SerialPort> Device<T> {
             }
         }
 
-        let frame = MISOFrame::from_bytes(&out);
+        let frame = MISOFrame::from_bytes(&out)?;
 
         if !frame.is_ok() {
             Err(StateResponseError::from(frame.get_state()))?;

@@ -101,8 +101,11 @@ pub struct MISOFrame {
 
 impl MISOFrame {
     /// Parses the data from raw bytes should come from a bytestream of the device
-    pub fn from_bytes(data: &[u8]) -> Self {
+    pub fn from_bytes(data: &[u8]) -> Result<Self, TranslationError> {
         let decoded = from_shdlc(data).unwrap();
+        if decoded.is_empty() {
+            return Err(TranslationError::NoData);
+        }
         let address = decoded[0];
         let command = decoded[1];
         let state = decoded[2];
@@ -111,14 +114,14 @@ impl MISOFrame {
         let mut data = ArrayVec::new();
         let _ = data.try_extend_from_slice(&decoded[4..4 + data_length as usize]);
 
-        Self {
+        Ok(Self {
             address,
             command,
             data_length,
             state,
             data,
             checksum,
-        }
+        })
     }
 
     /// Reads the state byte and returns true if its 0
@@ -240,6 +243,8 @@ pub enum TranslationError {
     MissingEscapedData(u8),
     /// The frame end byte was fround inside the data
     FrameEndInData,
+    /// The data given to be converted was empty
+    NoData,
 }
 
 impl Display for TranslationError {
@@ -261,6 +266,10 @@ impl Display for TranslationError {
                 "the escape byte ({:#02x}) was placed before an invalid escaped byte: ({:#02x})",
                 ESCAPE, b
             ),
+            Self::NoData => write!(
+                f,
+                "The data given to be translated was empty",
+            )
         }
     }
 }
